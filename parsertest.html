@@ -38,6 +38,10 @@
             margin: 2%;
             border-radius: 10px;
         }
+
+        pre {
+            font-size: 60%;
+        }
     </style>
   </head>
     
@@ -322,6 +326,8 @@ let assignRanks = (g, selectTable) => {
         if (edge.nodes[0].depth > edge.nodes[1].depth){
             if (edge.operator == "<") edge.operator = ">"
             else if (edge.operator == ">") edge.operator = "<"
+            else if (edge.operator == ">=") edge.operator = "<="
+            else if (edge.operator == "<=") edge.operator = ">="
             edge.nodes = [edge.nodes[1], edge.nodes[0]];
         }
     }
@@ -413,7 +419,21 @@ let getAttrInTable = (g, node) => {
     return attr
 }
 
-let manageSubQuery = (g, astNode, subquerytype, othernode) => {
+let getTableFromAttrIdentifier = (g, node) => {
+    let table, talias;
+    if (node.value.includes(".")){
+        talias = node.value.split(".")[0]
+        table = g.groups.find(gr => gr.grouptype == "table" && gr.tablealias == talias)
+    } else {
+        let schemaEntry = schema.split('\n').find(l => 
+            l.split("(")[1].replace(")", "").split(",").find(el => el.trim() == node.value + "")
+        ).split('(')[0]
+        table = g.groups.find(gr => gr.grouptype == "table" && (gr.name == schemaEntry))
+    }
+    return table;
+}
+
+let manageSubQuery = (g, astNode, subquerytype, prevnode) => {
     console.log("AST NODE", astNode)
     subquerycount += 1;
 
@@ -436,9 +456,9 @@ let manageSubQuery = (g, astNode, subquerytype, othernode) => {
         for (let el of astNode.selectItems.value){
             if (el.value.includes("*")) continue;
             let attr1 = getAttrInTable(g, el)
-            let attr2 = getAttrInTable(g, othernode)
+            let attr2 = getAttrInTable(g, prevnode.left)
 
-            g.addEdge({nodes: [attr1, attr2]})
+            g.addEdge({nodes: [attr1, attr2], operator: prevnode.operator})
         }
     }
     
@@ -453,7 +473,7 @@ let manageSubQuery = (g, astNode, subquerytype, othernode) => {
 
 let manageWhere = (g, astNode) => {
     
-    let getAttrInTable = (table, attrname) => {
+    let getAttrInTable2 = (table, attrname) => {
         let res = table.nodes.find(n => n.name == attrname);
         if (res != undefined) return res;
         else {
@@ -476,7 +496,7 @@ let manageWhere = (g, astNode) => {
         } else if (node.type == "SubQuery") {
             return manageSubQuery(g, node.value);
         } else if (node.type == "ComparisonSubQueryBooleanPrimary") {
-            return manageSubQuery(g, node.right, "ALL", node.left);
+            return manageSubQuery(g, node.right, "ALL", node);
         } else if (node.type == "ComparisonBooleanPrimary") {
             let leftElem = node.left.value;
             let rightElem = node.right.value;
@@ -492,29 +512,34 @@ let manageWhere = (g, astNode) => {
                 let rightTable = g.groups.find(gr => gr.grouptype == "table" && (gr.name == rightTableName || gr.tablealias == rightTableName))
 
                 if (leftTable == undefined) {
-                    let schemaEntry = schema.split('\n').find(l => l.split("(")[1].replace(")").split(",").find(el => el.trim() == leftTableName)).split('(')[0]
+                    let schemaEntry = schema.split('\n').find(l => l.split("(")[1].replace(")", "").split(",").find(el => el.trim() == leftTableName)).split('(')[0]
                     leftTable = g.groups.find(gr => gr.grouptype == "table" && (gr.name == schemaEntry))
                     leftAttrName = leftTableName;
                 } 
                 if (rightTable == undefined) {
-                    let schemaEntry = schema.split('\n').find(l => l.split("(")[1].replace(")").split(",").find(el => el.trim() == rightTableName)).split('(')[0]
+                    let schemaEntry = schema.split('\n').find(l => l.split("(")[1].replace(")", "").split(",").find(el => el.trim() == rightTableName)).split('(')[0]
                     rightTable = g.groups.find(gr => gr.grouptype == "table" && (gr.name == schemaEntry))
                     rightAttrName = rightTableName;
                 }
 
-                let leftTableAttr = getAttrInTable(leftTable, leftAttrName);
-                let rightTableAttr = getAttrInTable(rightTable, rightAttrName);
+                let leftTableAttr = getAttrInTable2(leftTable, leftAttrName);
+                let rightTableAttr = getAttrInTable2(rightTable, rightAttrName);
 
                 g.addEdge({nodes: [leftTableAttr, rightTableAttr], operator: node.operator})
 
                 return [leftTableAttr, rightTableAttr]
             } else if (node.left.type == "Identifier" && node.right.type != "Identifier") {
 
-                let leftTableName = leftElem.split(".")[0]
-                let leftAttrName = leftElem.split(".")[1]
+                // let leftTableName = leftElem.split(".")[0]
+                // let leftAttrName = leftElem.split(".")[1]
 
-                let leftTable = g.groups.find(gr => gr.grouptype == "table" && (gr.name == leftTableName || gr.tablealias == leftTableName))
-                newNode = {name: leftAttrName + " " + node.operator + " " + node.right.value, depth: 0, table: leftTable, nodetype: "constraint"}
+                let attrName;
+                let leftTable = getTableFromAttrIdentifier(g, node.left)
+                if (node.left.value.includes(".")) attrName = node.left.value.split(".")[1]
+                else attrName = node.left.value
+
+                // let leftTable = g.groups.find(gr => gr.grouptype == "table" && (gr.name == leftTableName || gr.tablealias == leftTableName))
+                newNode = {name: attrName + " " + node.operator + " " + node.right.value, depth: 0, table: leftTable, nodetype: "constraint"}
                 g.addNode(newNode)
                 leftTable.nodes.push(newNode)
             }
@@ -537,7 +562,7 @@ let subquerycount = 0;
 for (let i in QUERY){
     subquerycount = 0;
     subquerymap = {};
-    if (count < 30) {count++; continue;}
+    if (count < 0) {count++; continue;}
 
     console.log("QUERY NUM: ", count)
     query = QUERY[i];
@@ -614,10 +639,10 @@ for (let i in QUERY){
         runSimpleLpWorker(g, row, i)
     } catch (error) {console.log("ERROR IN QUERY " + count + "\n", error)}
 
-    let wrong = [30, 31, 32]
+    let wrong = [32, 34, 35, 36, 40, 41, 42]
     if (wrong.includes(count)) row.style("background-color", "#FCC")
 
-    if (count == 35) break;
+    if (count == 42) break;
     count++;
 }
 
@@ -650,7 +675,7 @@ async function runSimpleLpWorker(g, row, qindex) {
 
             row.append("div").attr("class", "col-sm").style("text-align", "center")
                 .append("img").attr("src", "./qv_pics/" + qindex + ".png")
-                .style("max-width", "50%").style("padding", "3%")
+                .style("max-width", "70%").style("padding", "3%")
         });
 
         setTimeout(() => {

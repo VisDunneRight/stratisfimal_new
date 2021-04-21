@@ -639,7 +639,7 @@ for (let i in QUERY){
         runSimpleLpWorker(g, row, i)
     } catch (error) {console.log("ERROR IN QUERY " + count + "\n", error)}
 
-    let wrong = [32, 34, 35, 36, 40, 41, 42]
+    let wrong = [8, 32, 34, 35, 36, 40, 41, 42]
     if (wrong.includes(count)) row.style("background-color", "#FCC")
 
     if (count == 42) break;

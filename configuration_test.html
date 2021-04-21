@@ -1,0 +1,570 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script src="./lib/seedrandom.min.js"></script>
+  <script src="./lib/d3.v5.min.js"></script>
+  <script src="./lib/glpk.min.js"></script>
+  <script src="./lib/mysql.umd.js"></script>
+  <script src="./js/query_samples/queries.js"></script>
+
+  <link rel="stylesheet" href="./css/bootstrap.min.css">
+</head>
+
+<style>
+    body {
+        font-family: Arial, Helvetica, sans-serif;
+        margin: 5%;
+    }
+
+    svg {
+        margin: 1%;
+        background-color: white;
+    }
+
+    .algorithm_header {
+        font-size: 2em;
+        font-weight: bold;
+        margin-top: 100px;
+        margin-bottom: 20px;
+    }
+
+    .rowDiv {
+        margin-top: 20px;
+    }
+
+    .customSlider {
+        display: flex;
+    }
+
+    .valueSpan {
+        margin-left: 2%;
+        color: #4747ca;
+        font-weight: bold;
+    }
+
+    .customLabel {
+        margin-right: 4%;
+        font-size: small;
+    }
+
+    .disabled {
+        opacity: 0.5;
+    }
+
+    .modelDivClass {
+        font-size: x-small;
+        white-space: pre-wrap;
+        font-family: "Lucida Console", Monaco, monospace;
+        background-color: #eee;
+        padding: 2%;
+        border-radius: 4px;
+    }
+
+    .redrawButton {
+        margin-top: 5px;
+        float: right;
+    }
+
+</style>
+
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-6">
+
+                <a class="btn btn-secondary" style="width: 100%" data-toggle="collapse" href="#collapseExample" role="button" aria-expanded="false" aria-controls="collapseExample" id="generateFromQueryBtn">
+                    <h4>Generate from query</h4>
+                  </a>
+                <div class="collapse card-body" id="collapseExample">
+                    <div id="dropdown-container" class="dropdown">
+                        <button class="btn btn-secondary dropdown-toggle" style='width: 100%; font-size: small;' type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            Select a query
+                        </button>
+                    </div>
+                    Schema:
+                    <div id="schemaTextContainer" class="modelDivClass overflow-auto" contenteditable="true"></div>
+                    Query:
+                    <div id="queryTextContainer" class="modelDivClass overflow-auto" contenteditable="true">
+                    </div>
+                    <button class="btn btn-secondary redrawButton" onclick="redraw_query()">Redraw</button>
+                </div>
+
+                <br>
+
+                <a class="btn btn-secondary" style="width: 100%; margin-top: 20px" data-toggle="collapse" href="#collapseExample2" role="button" aria-expanded="false" aria-controls="collapseExample" id="randomGraphGenerationBtn">
+                    <h4>Random graph generation</h4>
+                </a>
+                
+                <div class="collapse card-body" id="collapseExample2">
+                    <div id="depthSlider" class="customSlider">
+                        <label for="slider" class="customLabel">Number of columns (depth)</label>
+                        <input type="range" class="custom-range" min="0" max="6" id="slider">
+                        <span class="valueSpan"></span>
+                    </div>
+                    
+                    <div id="seedinput">
+                        <label for="exampleFormControlInput1" class="customLabel">Seed</label>
+                        <input class="form-control" id="exampleFormControlInput1" placeholder="Seed">
+                    </div>
+                    
+                    <!-- <div class="card"> -->
+                        <div class="card-body">
+                            <h6>Tables per column</h6>
+                            <div class="row">
+                                <div class="col">
+                                    <div id="minTableSlider" class="customSlider">
+                                        <label for="customRange2" class="customLabel">Min</label>
+                                        <input type="range" class="custom-range" min="1" max="5" id="slider2" value="3">
+                                        <span class="valueSpan"></span>
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div id="maxTableSlider" class="customSlider">
+                                        <label for="slider3" class="customLabel">Max</label>
+                                        <input type="range" class="custom-range" min="1" max="5" id="slider3" value="3">
+                                        <span class="valueSpan"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <!-- </div> -->
+
+                    <div class="card-body">
+                        <h6>Attributes per table</h6>
+                        <div class="row">
+                            <div class="col">
+                                <div id="minAttrSlider" class="customSlider">
+                                    <label for="customRange2" class="customLabel">Min</label>
+                                    <input type="range" class="custom-range" min="1" max="5" id="customRange2">
+                                    <span class="valueSpan"></span>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div id="maxAttrSlider" class="customSlider">
+                                    <label for="customRange2" class="customLabel">Max</label>
+                                    <input type="range" class="custom-range" min="1" max="5" id="customRange2">
+                                    <span class="valueSpan"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="sameRankSlider" class="customSlider">
+                        <label for="customRange2" class="customLabel">Same-rank edge frequency</label>
+                        <input type="range" class="custom-range" min="0" max="1" id="customRange2" step="0.1" value="0">
+                        <span class="valueSpan"></span>
+                    </div>
+
+                    <div id="randomEdgeSlider" class="customSlider">
+                        <label for="customRange2" class="customLabel">Random edge frequency</label>
+                        <input type="range" class="custom-range" min="0" max="1" id="customRange2" step="0.1" value="0.5">
+                        <span class="valueSpan"></span>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="col">
+                <h4>LP Settings</h4>
+
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                      <li class="breadcrumb-item active" aria-current="page">Number of constraints generated: 
+                          <div id="constraintNum" style="margin-left: 5px; font-weight: bold;"></div>
+                        </li>
+                    </ol>
+                  </nav>
+
+                <h5>Crossing reduction</h5> 
+                <div class="input-group-text">
+                    <input type="checkbox" aria-label="Checkbox for following text input" id="crossingsActiveButton" checked> <div id="crossingsActiveLabel" style ="margin-left: 5px">Active</div>
+                </div>
+
+                <br>
+
+                <div id="crossingsWeightSlider" class="customSlider">
+                    <label for="slider4" class="customLabel">Weight</label>
+                    <input type="range" class="custom-range" min="0" max="1" id="slider4" step="0.01" value="1">
+                    <span class="valueSpan"></span>
+                </div>
+
+                <br>
+
+                <h5>Edge bendiness reduction</h5> 
+                <div class="input-group-text">
+                    <input type="checkbox" aria-label="Checkbox for following text input" id="bendinessActiveButton" checked> <div id="bendinessActiveLabel" style ="margin-left: 5px">Active</div>
+                </div>
+
+                <br>
+
+                Type <br>
+                <div class="btn-group btn-group-toggle" data-toggle="buttons" id="bendinessTypeButtons">
+                    <label class="btn btn-secondary active">
+                      <input type="radio" name="options" id="bendinessRadio1" autocomplete="off" checked> Simple
+                    </label>
+                    <label class="btn btn-secondary">
+                      <input type="radio" name="options" id="bendinessRadio2" autocomplete="off"> Optimize crossing angles
+                    </label>
+                  </div>
+
+                  <br>
+                  <br>
+
+                  <div id="bendinessWeightSlider" class="customSlider">
+                    <label for="slider4" class="customLabel">Weight</label>
+                    <input type="range" class="custom-range" min="0" max="1" id="slider4" step="0.01" value="0.1">
+                    <span class="valueSpan"></span>
+                </div>
+
+                <div id="bendinessAngleOptimizationSlider" class="customSlider">
+                    <label for="slider4" class="customLabel">Crossing Angle Maximization Weight</label>
+                    <input type="range" class="custom-range" min="0" max="1" id="slider4" step="0.01" value="0.01">
+                    <span class="valueSpan"></span>
+                </div>
+            </div>
+
+            <div class="col">
+                <h4>Generated problem</h4>
+                <div class="overflow-auto modelDivClass" id="modelDiv" style="height: 400px"></div>
+            </div>
+        </div>
+
+        <div class="row">
+          <div class="col">
+            <div id="vis-div"></div>
+          </div>
+        </div>
+      </div>
+
+    <!-- bootstrap -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+</body>
+
+<script src="./dist/dist.js"></script>
+<script>
+
+var svg_height = 500
+var svg_width = 1000
+
+const attr_height = 15
+const table_width = 100
+const depth_distance = 200
+let header_height = attr_height
+let table_vert_space = 100
+
+var depth = 4;
+var seed = "Seed"
+var tableDistribution = [3, 3];
+var attributeDistribution = [3, 5];
+var sameEdgeDistribution = 0;
+var randomEdgeDistribution = 1;
+
+var algorithm;
+var LPoptions = {
+    bendiness_reduction_type: "simple",
+    bendiness_reduction_active: true,
+    crossings_reduction_active: false,
+    crossings_reduction_weight: 1,
+    bendiness_reduction_weight: 0.1,
+    bendiness_angle_optimization_weight: 0.01
+};
+
+var graphInputMethod = 'sampleQuery'; // or randomlyGenerated;
+var selectedQuery = 101;
+var selectedSchema = "Bars";
+var selectedQueryText = QUERY[selectedQuery];
+var selectedSchemaText = SCHEMA[selectedSchema];
+
+var dropdownDict = {
+    101: "101 Bars: Persons who frequent a bar.",
+    102: "102 Bars: Persons, bars they frequent, and drinks that are served.",
+    103: "103 Bars: Persons who frequent some bar that serves some drink they like.",
+    104: "104 Bars: Persons who frequent some bar that serves some drink they like.",
+    111: "111 Bars: Persons who frequent only bars that serve some drink they like.",
+    112: "112 Bars: Persons who frequent only bars that serve some drink they like.",
+    121: "121 Bars: Persons who frequent some bar that serves only drinks they like.",
+    131: "131 Bars: Bars that serve a drink liked by Joe, but none liked by Michael.",
+    136: "136 Bars: Persons who frequent a bar with >= 2 beers they like, one <3$ and one >5$.",
+    137: "137 Bars: Persons who frequent bars with a drink < 3$ and at least two with > 5$.",
+    140: "140 Bars: Persons who do not frequent bars with 'Golden' and a more expensive drink.",
+    151: "151 Bars: Bars that serve every beer that Joe likes.",
+    155: "155 Bars: Persons who like a beer that Joe likes and is served somewhere at > $5.",
+    156: "156 Bars: Persons who like a beer that Joe likes and is served somewhere at > $5.",
+    160: "160 Bars: Drinks that are the unique drinks liked by a person.",
+    161: "161 Bars: Drinks that are the unique drinks liked by a person.",
+    
+    201: "201 IMDB: Random node placement.",
+    202: "202 IMDB: Actors who have played in movies before 1900. ",
+    203: "203 IMDB: Movies in which Kevin Bacon plays, together with all its actors.",
+    204: "204 IMDB: Movies in which Kevin Bacon plays, together with all its actors.",
+    205: "205 IMDB: Actors with Kevin Bacon number 1.",
+    206: "206 IMDB: Actors with Kevin Bacon number 2. ",
+    207: "207 IMDB: Movies and actors in with Kevin Bacon does not play.",
+
+    301: "301 Sailors: Sailors who have reserved all boats. ",
+    302: "302 Sailors: Sailors who have reserved all red boats. ",
+    303: "303 Sailors: Sailors who have not reserved a red boats. ",
+
+    401: "401 Worlds: Worlds where each tuple is already contained in some earlier world.",
+    411: "411 Worlds: Worlds for which there exists one other, earlier world that contains all its tuples.",
+    412: "412 Worlds: Worlds for which there is no earlier world that contains all its tuples.",
+    416: "416 Worlds: Worlds for which there is no earlier world with exactly the same tuples.",
+    451: "451 Worlds: Worlds with a tuple that does not appear in a later world.",
+
+    501: "501 Abstract: Attribute value between numerical values.",
+    503: "503 Abstract: Attribute comparisons.",
+    505: "505 Abstract: Attribute comparisons inside a component.",
+    506: "506 Abstract: Attribute comparisons inside a component.",
+    507: "507 Abstract: Attribute comparisons inside a component.",
+    508: "508 Abstract: Attribute comparisons between components.",
+    511: "511 Abstract: Multiple conjunctive selections on predicates.",
+    551: "551 Abstract: R.A with R.B biggest among all R.Bs.",
+    561: "561 Abstract: R.A where R.B is different from at least one S.B.",
+    562: "562 Abstract: R.A where R.B is different from at least one S.B.",
+    571: "571 Abstract: R.A so that R.B is different from all S.B.",
+    573: "573 Abstract: R.A for which R.B is not in S.B."
+}
+
+var dcont = document.getElementById('dropdown-container')
+var dchild = document.createElement('div')
+dchild.className = "dropdown-menu"
+dchild.style.height = "600px"
+dchild.style.overflow = "scroll"
+dcont.append(dchild)
+
+for (let q in QUERY){
+    if (q == 0) continue;
+    if (QUERY[q] == undefined) continue;
+    var dq = document.createElement('div')
+    dq.className = "dropdown-item"
+    dq.innerHTML = dropdownDict[q];
+    dq.style.fontSize = "small";
+    dq.value = q;
+    dchild.append(dq);
+
+    dchild.onclick = (a) => {
+        let val = a.target.value;
+        selectedQuery = val;
+
+        if (val <= 161) selectedSchema = "Bars"
+        else if (val <= 207) selectedSchema = "IMDB"
+        else if (val <= 303) selectedSchema = "Sailors"
+        else if (val <= 451) selectedSchema = "Belief worlds"
+        else selectedSchema = "Abstract"
+
+        document.getElementById("dropdownMenuButton").innerHTML = dropdownDict[selectedQuery];
+        document.getElementById("queryTextContainer").innerHTML = QUERY[selectedQuery];
+        document.getElementById("schemaTextContainer").innerHTML = SCHEMA[selectedSchema];
+
+        selectedQueryText = QUERY[selectedQuery];
+        selectedSchemaText = SCHEMA[selectedSchema];
+
+        update_settings();
+    }
+}
+
+document.getElementById("dropdownMenuButton").innerHTML = dropdownDict[selectedQuery];
+document.getElementById("queryTextContainer").innerHTML = QUERY[selectedQuery];
+document.getElementById("schemaTextContainer").innerHTML = SCHEMA[selectedSchema];
+
+var redraw_query = () => {
+    selectedSchemaText = document.getElementById('schemaTextContainer').textContent;
+    selectedQueryText = document.getElementById('queryTextContainer').textContent;
+
+    update_settings();
+}
+
+var update_settings = () => {
+
+    // $("#collapseExample").collapse({toggle: true})
+    document.getElementById("randomGraphGenerationBtn").onclick = (a) => {
+        // $("#collapseExample").collapse('toggle')
+        if (graphInputMethod == "sampleQuery") graphInputMethod = "randomlyGenerated";
+        else graphInputMethod = "sampleQuery"
+        update_settings()
+    }
+    document.getElementById("generateFromQueryBtn").onclick = (a) => {
+        // $("#collapseExample2").collapse('toggle')
+        if (graphInputMethod == "sampleQuery") graphInputMethod = "randomlyGenerated";
+        else graphInputMethod = "sampleQuery"
+        update_settings()
+    }
+
+    depth = document.getElementById("depthSlider").getElementsByTagName('input')[0].value;
+    document.getElementById("depthSlider").getElementsByTagName('input')[0].onchange = update_settings;
+    document.getElementById("depthSlider").getElementsByClassName('valueSpan')[0].innerHTML = depth;
+
+    seed = document.getElementById("seedinput").getElementsByTagName('input')[0].value;
+    document.getElementById("seedinput").getElementsByTagName('input')[0].onchange = update_settings;
+
+    tableDistribution[0] = parseInt(document.getElementById("minTableSlider").getElementsByTagName('input')[0].value);
+    document.getElementById("minTableSlider").getElementsByTagName('input')[0].onchange = update_settings;
+    document.getElementById("minTableSlider").getElementsByClassName('valueSpan')[0].innerHTML = tableDistribution[0];
+    document.getElementById("maxTableSlider").getElementsByTagName('input')[0].min = tableDistribution[0];
+
+    tableDistribution[1] = parseInt(document.getElementById("maxTableSlider").getElementsByTagName('input')[0].value);
+    document.getElementById("maxTableSlider").getElementsByTagName('input')[0].onchange = update_settings;
+    document.getElementById("maxTableSlider").getElementsByClassName('valueSpan')[0].innerHTML = tableDistribution[1];
+    document.getElementById("minTableSlider").getElementsByTagName('input')[0].max = tableDistribution[1];
+
+    attributeDistribution[0] = parseInt(document.getElementById("minAttrSlider").getElementsByTagName('input')[0].value);
+    document.getElementById("minAttrSlider").getElementsByTagName('input')[0].onchange = update_settings;
+    document.getElementById("minAttrSlider").getElementsByClassName('valueSpan')[0].innerHTML = attributeDistribution[0];
+    document.getElementById("maxAttrSlider").getElementsByTagName('input')[0].min = attributeDistribution[0];
+
+    attributeDistribution[1] = parseInt(document.getElementById("maxAttrSlider").getElementsByTagName('input')[0].value);
+    document.getElementById("maxAttrSlider").getElementsByTagName('input')[0].onchange = update_settings;
+    document.getElementById("maxAttrSlider").getElementsByClassName('valueSpan')[0].innerHTML = attributeDistribution[1];
+    document.getElementById("minAttrSlider").getElementsByTagName('input')[0].max = attributeDistribution[1];
+
+    sameEdgeDistribution = document.getElementById("sameRankSlider").getElementsByTagName('input')[0].value;
+    document.getElementById("sameRankSlider").getElementsByTagName('input')[0].onchange = update_settings;
+    document.getElementById("sameRankSlider").getElementsByClassName('valueSpan')[0].innerHTML = sameEdgeDistribution;
+
+    randomEdgeDistribution = document.getElementById("randomEdgeSlider").getElementsByTagName('input')[0].value;
+    document.getElementById("randomEdgeSlider").getElementsByTagName('input')[0].onchange = update_settings;
+    document.getElementById("randomEdgeSlider").getElementsByClassName('valueSpan')[0].innerHTML = randomEdgeDistribution;
+
+    LPoptions.bendiness_reduction_active = document.getElementById("bendinessActiveButton").checked;
+    document.getElementById("bendinessActiveButton").onchange = update_settings;
+    if (LPoptions.bendiness_reduction_active == false) {
+        document.getElementById("bendinessActiveLabel").textContent = "Inactive"
+        document.getElementById('bendinessTypeButtons').classList.add("disabled");
+        document.getElementById('bendinessWeightSlider').classList.add("disabled");
+        document.getElementById('bendinessAngleOptimizationSlider').classList.add("disabled");
+    } else {
+        document.getElementById("bendinessActiveLabel").textContent = "Active"
+        document.getElementById('bendinessTypeButtons').classList.remove("disabled");
+        document.getElementById('bendinessWeightSlider').classList.remove("disabled");
+        document.getElementById('bendinessAngleOptimizationSlider').classList.remove("disabled");
+    }
+
+    LPoptions.crossings_reduction_active = document.getElementById("crossingsActiveButton").checked;
+    document.getElementById("crossingsActiveButton").onchange = update_settings;
+    if (LPoptions.crossings_reduction_active == false) {
+        document.getElementById("crossingsActiveLabel").textContent = "Inactive"
+        document.getElementById('crossingsWeightSlider').classList.add("disabled");
+    } else {
+        document.getElementById("crossingsActiveLabel").textContent = "Active"
+        document.getElementById('crossingsWeightSlider').classList.remove("disabled");
+    }
+
+    LPoptions.crossings_reduction_weight = document.getElementById("crossingsWeightSlider").getElementsByTagName('input')[0].value;
+    document.getElementById("crossingsWeightSlider").getElementsByTagName('input')[0].onchange = update_settings;
+    document.getElementById("crossingsWeightSlider").getElementsByClassName('valueSpan')[0].innerHTML = LPoptions.crossings_reduction_weight;
+
+    LPoptions.bendiness_reduction_weight = document.getElementById("bendinessWeightSlider").getElementsByTagName('input')[0].value;
+    document.getElementById("bendinessWeightSlider").getElementsByTagName('input')[0].onchange = update_settings;
+    document.getElementById("bendinessWeightSlider").getElementsByClassName('valueSpan')[0].innerHTML = LPoptions.bendiness_reduction_weight;
+
+    LPoptions.bendiness_angle_optimization_weight = document.getElementById("bendinessAngleOptimizationSlider").getElementsByTagName('input')[0].value;
+    document.getElementById("bendinessAngleOptimizationSlider").getElementsByTagName('input')[0].onchange = update_settings;
+    document.getElementById("bendinessAngleOptimizationSlider").getElementsByClassName('valueSpan')[0].innerHTML = LPoptions.bendiness_angle_optimization_weight;
+
+
+    if (document.getElementById('bendinessRadio1').checked) {
+        LPoptions.bendiness_reduction_type = "simple"
+        document.getElementById("bendinessAngleOptimizationSlider").classList.add("disabled");
+    }
+    else if (document.getElementById('bendinessRadio2').checked) {
+        LPoptions.bendiness_reduction_type = "optimize_angles"
+        document.getElementById("bendinessAngleOptimizationSlider").classList.remove("disabled");
+    }
+    document.getElementById('bendinessRadio1').onchange = update_settings;
+    document.getElementById('bendinessRadio2').onchange = update_settings;
+
+    update_vis()
+
+    if (algorithm != undefined && algorithm.numConstraints != undefined) {
+        document.getElementById('constraintNum').innerHTML = algorithm.numConstraints;
+        document.getElementById('modelDiv').innerHTML = algorithm.modelString;
+    }
+}
+
+// *********
+// *********
+var update_vis = () => {
+    d3.select("#vis-div").select('svg').remove()
+    d3.select("#vis-div").select('div').remove()
+
+    if (graphInputMethod == "sampleQuery"){
+        g = parseQuery(selectedQueryText, selectedSchemaText)
+        if (LPoptions.bendiness_reduction_active == false && LPoptions.crossings_reduction_active == false) g.addBlankTables()
+        g.sendGroupsToTop()
+    } else {
+        g = new GraphGenerator(depth, seed, tableDistribution, attributeDistribution, sameEdgeDistribution, randomEdgeDistribution)
+        g = g.generate()
+    }
+
+    algorithm = new LPBendinessCombinedPlusGroups(g, LPoptions)
+    algorithm.arrange()
+
+    if (LPoptions.bendiness_reduction_active == false && LPoptions.crossings_reduction_active == false) g.setExactWeights();
+
+    svg_width = (1 + Math.max.apply(0, g.tables.map(t => t.depth)))*depth_distance
+
+    svg = d3.select("#vis-div")
+            .style('width', '80%')
+            .style('text-align', 'center')
+            .append('svg')
+            .attr('class', 'vis-svg')
+            .attr('easypz', '{"applyTransformTo":"svg > *"}')
+            .attr("preserveAspectRatio", "xMinYMin meet")
+            .attr("viewBox", "0 0 " + (svg_width) + " " + (svg_height))
+
+    drawGraph(svg, g)
+}
+
+update_settings()
+// update_vis()
+
+// async function runLpWorker(g, rowDiv, cur_svg_width, cur_svg_height) {
+//         let myWorker = new Worker('./js/worker.js')
+//         myWorker.postMessage({'cmd': 'lp', 'graph': g});
+//         let finished = false;
+
+//         let algorithm;
+
+//         myWorker.addEventListener('message', (msg) => {
+//             finished = true;
+//             algorithm = msg.data.algorithm;
+//             for (table of msg.data.graph.tables){
+//                 t1 = g.tables.find(t => t.name == table.name)
+//                 t1.weight = table.weight
+
+//                 for (attribute of table.attributes){
+//                     a1 = t1.attributes.find(a => a.name == attribute.name)
+//                     a1.weight = attribute.weight
+//                 }
+//             }
+
+//             g.setExactWeights()
+//             g.sortGraph()
+//             g.adjustTableYPosition()
+
+//             svg = rowDiv
+//                     .append('div')
+//                     .style('width', '50%')
+//                     .append('svg')
+//                     .attr('class', 'vis-svg')
+//                     .attr('easypz', '{"applyTransformTo":"svg > *"}')
+//                     .attr("preserveAspectRatio", "xMinYMin meet")
+//                     .attr("viewBox", "0 0 " + cur_svg_width + " " + cur_svg_height)
+
+//             drawGraph(svg, g, algorithm)
+//         });
+
+//         setTimeout(() => {
+//             myWorker.terminate()
+//             if (!finished) console.log('worker terminated')
+//         }, 1000000);
+//     }
+
+// document.getElementById("randomGraphGenerationBtn").click()
+
+</script>
+</html>

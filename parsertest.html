@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="https://getbootstrap.com/docs/4.0/assets/img/favicons/favicon.ico">
+
+    <title>Stratisfimal Layout</title>
+
+    <link href="./css/neumorph.min.css" rel="stylesheet">
+
+    <link rel="canonical" href="https://getbootstrap.com/docs/4.0/examples/starter-template/">
+
+    <!-- Bootstrap core CSS -->
+    <link href="./css/bootstrap.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="./css/starter-template.css" rel="stylesheet">
+
+    <script src="./lib/seedrandom.min.js"></script>
+    <script src="./lib/d3.v5.min.js"></script>
+    <script src="./lib/glpk.min.js"></script>
+    <script src="./lib/sqlParser.js"></script>
+
+    <script src="./simple/simplegraph.js"></script>
+    <script src="./simple/simpleLp.js"></script>
+    <script src="./simple/testCaseGenerator.js"></script>
+
+    <script src="./js/GroupCreation.js"></script>
+    <script src="./js/readFromJson.js"></script>
+    <script src="./js/GroupCreation.js"></script>
+    
+    <script src="./js/query_samples/queries.js"></script>
+    <style>
+        .row-divided {
+            margin: 2%;
+            border-radius: 10px;
+        }
+    </style>
+  </head>
+    
+  <body>
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <!-- <script src="./lib/jquery-3.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script> -->
+    <!-- <script>window.jQuery || document.write('<script src="../../assets/js/vendor/jquery-slim.min.js"><\/script>')</script> -->
+    <!-- <script src="./lib/popper.js"></script> -->
+    <!-- <script src="./lib/bootstrap.js"></script> -->
+        
+</body>
+
+<script>
+
+let drawQuery = (svg, graph, nodeXDistance = 50, nodeYDistance = 50) => {
+
+    let getNodeCoordX = (node) => (150 + nodeXDistance * (node.depth));
+    let getNodeCoordY = (node) => {
+        let nbuffer = 0;
+        let tmpgroups = graph.groups.filter(gr => gr.grouptype == "table" && gr.nodes.find(n => n.depth == node.depth))
+        tmpgroups.sort((a, b) => parseFloat(graph.nodeIndex[node.depth].indexOf(a.nodes[0])) > parseFloat(graph.nodeIndex[node.depth].indexOf(b.nodes[0])))
+        nbuffer += tmpgroups.indexOf(graph.groups.find(gr => gr.grouptype == "table" && gr.nodes.includes(node)))*(nodeYDistance*2)
+        if (node.y != undefined) return 150 + node.y * nodeYDistance;
+        else return nodeYDistance + parseFloat(20 + nbuffer + graph.nodeIndex[node.depth].indexOf(node) * nodeYDistance)
+    };
+    let line = d3.line().curve(d3.curveBasis);
+    let colors = ['#303E3F', '#A3B9B6'];
+
+    let attrWidth = 100
+
+    let defs = svg.append('defs').append('marker')
+        .attr("id", "arrowhead")
+        .attr("viewBox", '0 -5 10 10')
+        .attr("refX", 8)
+        .attr("refY", 0)
+        .attr("orient", "auto")
+        .attr("markerWidth", 8)
+        .attr("markerHeight", 8)
+        .attr("xoverflow", "visible")
+        .append('svg:path')
+        .attr('d', 'M 0,-5 L 10,0 L 0,5')
+        .attr('fill', 'black')
+        .style('stroke','none');
+
+    for (let edge of graph.edges){
+        let path = svg.append('path')
+            .attr('class', 'edgepath')
+            .attr('fill', 'none')
+            .attr('stroke', 'black')
+            .attr('stroke-width', 1)
+            .attr('d', () => {
+                let m = 0;
+                let s1 = 0;
+                let s2 = 0;
+                let isSameRankEdge = edge.nodes[0].depth == edge.nodes[1].depth
+                if (isSameRankEdge) m = nodeXDistance*.2 + (Math.abs(getNodeCoordY(edge.nodes[0]) - getNodeCoordY(edge.nodes[1]))/(nodeYDistance/8));
+                else {
+                    s1 = nodeXDistance*.4;
+                    s2 = -nodeXDistance*.4;
+                }
+                return line([
+                    [getNodeCoordX(edge.nodes[0]) + attrWidth/2, getNodeCoordY(edge.nodes[0])], 
+                    [getNodeCoordX(edge.nodes[0]) + m + s1, getNodeCoordY(edge.nodes[0])], 
+                    [getNodeCoordX(edge.nodes[1]) + m + s2, getNodeCoordY(edge.nodes[1])],
+                    [getNodeCoordX(edge.nodes[1]) + (isSameRankEdge? + attrWidth/2 : - attrWidth/2), getNodeCoordY(edge.nodes[1])]
+                ])
+            })
+ 
+        if (edge.operator != undefined && edge.operator != "="){
+            let pathLenght = path.node().getTotalLength()
+            let midpoint = path.node().getPointAtLength(pathLenght/2)
+
+            svg.append('circle').attr('cx', midpoint.x).attr('cy', midpoint.y).attr('r', 9).attr('fill', "#f2f3f7")
+
+            svg.append('text')
+                .attr('x', midpoint.x)
+                .attr('y', midpoint.y)
+                .attr('text-anchor', 'middle')
+                .style('font-size', '0.6em')
+                .style('dominant-baseline', 'middle')
+                .text(edge.operator)
+        }
+
+        if (edge.operator == "="){
+            path.attr("marker-end", "url(#arrowhead)")
+        }
+    }
+
+    for (let group of graph.groups.filter(gr => gr.grouptype == "table")){
+        let topnode = group.nodes.sort((a, b) => getNodeCoordY(a) > getNodeCoordY(b))[0]
+
+        let g = svg.append('g')
+            .attr('transform', 'translate(' + (getNodeCoordX(topnode)) + ',' + (getNodeCoordY(topnode) - nodeYDistance) +')')
+        
+        g.append("rect")
+            .attr('height', nodeYDistance)
+            .attr("width", attrWidth)
+            .attr('x', -attrWidth/2)
+            .attr('y', -nodeYDistance/2)
+            .attr('stroke-width', 1)
+            .attr("stroke", "black")
+            .attr("fill", "black")
+
+        g.append('text')
+            .text(group.name + (group.tablealias != group.name && group.tablealias != undefined? " " + group.tablealias : ""))
+            .attr('text-anchor', 'middle')
+            .style("font-family", "Arial")
+            .attr('y', 3)
+            .attr('fill', "white")
+            .style('font-size', '0.7em')
+            .style("font-weight", "bold")
+    }
+
+    for (let group of graph.groups.filter(gr => gr.grouptype == "negated_subquery" || gr.negateSingleTable == true)){
+        let topnode = group.nodes.sort((a, b) => getNodeCoordY(a) > getNodeCoordY(b))[0]
+        let bottomnode = group.nodes.sort((a, b) => getNodeCoordY(a) < getNodeCoordY(b))[0]
+        let leftmostnode = group.nodes.sort((a, b) => getNodeCoordX(a) > getNodeCoordX(b))[0]
+        let rightmostnode = group.nodes.sort((a, b) => getNodeCoordX(a) < getNodeCoordX(b))[0]
+
+        let groupmargin = 7
+
+        let g = svg.append('g')
+            .attr('transform', 'translate(' + (getNodeCoordX(leftmostnode)) + ',' + (getNodeCoordY(topnode) - nodeYDistance) +')')
+        
+        g.append("rect")
+            .attr('height', getNodeCoordY(bottomnode) - getNodeCoordY(topnode) + nodeYDistance*2 + groupmargin*2)
+            .attr("width", getNodeCoordX(rightmostnode) - getNodeCoordX(leftmostnode) + attrWidth + groupmargin*2)
+            .attr('x', -attrWidth/2 - groupmargin)
+            .attr('y', -nodeYDistance/2 - groupmargin)
+            .attr("rx", 5)
+            .attr("ry", 5)
+            .attr('stroke-width', 2)
+            .attr("stroke", "black")
+            .attr("fill", "none")
+            .attr("stroke-dasharray", "5 5")
+    }
+
+    for (let group of graph.groups.filter(gr => gr.grouptype == "all_subquery" || gr.allSingleTable == true)){
+        let topnode = group.nodes.sort((a, b) => getNodeCoordY(a) > getNodeCoordY(b))[0]
+        let bottomnode = group.nodes.sort((a, b) => getNodeCoordY(a) < getNodeCoordY(b))[0]
+        let leftmostnode = group.nodes.sort((a, b) => getNodeCoordX(a) > getNodeCoordX(b))[0]
+        let rightmostnode = group.nodes.sort((a, b) => getNodeCoordX(a) < getNodeCoordX(b))[0]
+
+        let groupmargin = 7
+
+        let g = svg.append('g')
+            .attr('transform', 'translate(' + (getNodeCoordX(leftmostnode)) + ',' + (getNodeCoordY(topnode) - nodeYDistance) +')')
+        
+        g.append("rect")
+            .attr('height', getNodeCoordY(bottomnode) - getNodeCoordY(topnode) + nodeYDistance*2 + groupmargin*2)
+            .attr("width", getNodeCoordX(rightmostnode) - getNodeCoordX(leftmostnode) + attrWidth + groupmargin*2)
+            .attr('x', -attrWidth/2 - groupmargin)
+            .attr('y', -nodeYDistance/2 - groupmargin)
+            .attr("rx", 5)
+            .attr("ry", 5)
+            .attr('stroke-width', 2)
+            .attr("stroke", "black")
+            .attr("fill", "none")
+
+        g.append("rect")
+            .attr('height', getNodeCoordY(bottomnode) - getNodeCoordY(topnode) + nodeYDistance*2 + (groupmargin + 3)*2)
+            .attr("width", getNodeCoordX(rightmostnode) - getNodeCoordX(leftmostnode) + attrWidth + (groupmargin + 3)*2)
+            .attr('x', -attrWidth/2 - groupmargin - 3)
+            .attr('y', -nodeYDistance/2 - groupmargin - 3)
+            .attr("rx", 5)
+            .attr("ry", 5)
+            .attr('stroke-width', 2)
+            .attr("stroke", "black")
+            .attr("fill", "none")
+    }
+
+    for (let depth in graph.nodeIndex){
+        for (let node of graph.nodeIndex[depth]){
+
+            let g = svg.append('g')
+                .attr('transform', 'translate(' + (getNodeCoordX(node)) + ',' + getNodeCoordY(node) +')')
+                .attr('opacity', () => {return node.type == "fake"? 0.3 : 1})
+
+            g.append('rect')
+                .datum(node)
+                .attr('class', 'node')
+                .attr('height', nodeYDistance)
+                .attr("width", attrWidth)
+                .attr('x', -attrWidth/2)
+                .attr('y', -nodeYDistance/2)
+                .attr('stroke-width', 1)
+                .attr("stroke", "black")
+                .attr('fill', node.nodetype == "constraint"? "#FFFF99" : "none")
+
+            g.append('text')
+                .text(node.name)
+                .attr('text-anchor', 'middle')
+                .style("font-family", "Arial")
+                .attr('y', 3)
+                .attr('fill', node.drawtype == "th"? "white" : "black")
+                .style('font-size', '0.63em')
+                .style("font-weight", "bold")
+        }
+    }
+
+    svg.attr("height", Math.max.apply(0, graph.nodes.map(n => getNodeCoordY(n) + 20)))
+    svg.attr("viewBox", "0 0 " + Math.max.apply(0, graph.nodes.map(n => getNodeCoordX(n) + 80)) + " " + Math.max.apply(0, graph.nodes.map(n => getNodeCoordY(n) + 50)))
+}
+
+let manageSelect = (g, ast, selectTable) => {
+    // if it's select *
+    if (ast.value.selectItems.value[0].value == "*"){
+        // look into all the from tables
+        for (let el of ast.value.from.value){
+            // find table in schema
+            let attrlist = getAttrsFromSchema(el.value.value.value, schema)
+            for (let attr of attrlist){
+                let newNode = {name: attr, depth: 0}
+                // if (!selectTable.nodes.find(n => n.name == attr)) {
+                    selectTable.nodes.push(newNode)
+                    g.addNode(newNode)
+                // }
+            }
+        }
+    } else { // otherwise
+        for (let el of ast.value.selectItems.value){
+            let attrname = ""
+            let talias = ""
+
+            // if it includes an alias in it
+            if (el.value.includes(".")){
+                attrname = el.value.split(".")[1]
+                talias = el.value.split(".")[0]
+            } else attrname = el.value
+
+            if (el.value.includes(".*")){
+                // do nothing (for now)
+            } else {
+                let newNode = {name: attrname, depth: 0, tablealias: talias}
+                selectTable.nodes.push(newNode)
+                g.addNode(newNode)
+            }
+        }
+    }
+}
+
+let assignRanks = (g, selectTable) => {
+    let moveToDepth = (table, newDepth) => {
+        for (let node of table.nodes){
+            // console.log(table.name, node, newDepth, g.nodeIndex[node.depth])
+            if (g.nodeIndex[node.depth].indexOf(node) != -1) 
+                g.nodeIndex[node.depth].splice(g.nodeIndex[node.depth].indexOf(node), 1);
+            node.depth = newDepth;
+            while (g.nodeIndex.length <= node.depth + 10) g.nodeIndex.push([]);
+            g.nodeIndex[node.depth].push(node);
+        }
+    }
+
+    curIndex = 0;
+    while(g.nodeIndex[curIndex] != undefined){
+        if (curIndex == 0){
+            for (let table of g.groups){
+                if (table.name == selectTable.name) moveToDepth(table, 0);
+                else moveToDepth(table, curIndex+1);
+            }
+        } else {
+            let tableSet = g.groups.filter(gr => {
+                if (gr.name == selectTable.name) return false;
+                if (!gr.nodes.some(n => n.depth == curIndex)) return false;
+                let isMovable = gr.nodes.every(n => {
+                    return g.edges.find(e => (e.nodes[0].depth == curIndex-1 && e.nodes[1] == n) || (e.nodes[1].depth == curIndex-1 && e.nodes[0] == n)) == undefined
+                })
+                return isMovable;
+            })
+            for (let table of tableSet){
+                moveToDepth(table, curIndex+1)
+            }
+        }
+        curIndex++;
+        if (curIndex == 10) break;
+    }
+
+    for (let edge of g.edges){
+        if (edge.nodes[0].depth > edge.nodes[1].depth){
+            if (edge.operator == "<") edge.operator = ">"
+            else if (edge.operator == ">") edge.operator = "<"
+            edge.nodes = [edge.nodes[1], edge.nodes[0]];
+        }
+    }
+}
+
+let manageFrom = (g, ast, selectTable) => {
+    
+    for (let el of ast.value.from.value){
+
+        let tablename = el.value.value.value
+        let talias = ""
+
+        if (el.value.alias != undefined) talias = el.value.alias.value
+        else talias = el.value.value.value
+
+        let newTable = {nodes: [], name: tablename, tablealias: talias, grouptype: "table"}
+
+        let attrsInNewTableFromSchema = schema.split('\n').find(l => l.split('(')[0].trim() == newTable.name).split("(")[1].replace(")", "").split(",").map(l => l.trim())
+        
+        for (let el2 of ast.value.selectItems.value){
+            if (el2.value == "*") {
+                let attrs = getAttrsFromSchema(newTable.name, schema)
+                
+                for (let attr of attrs){
+                    let newNode = {name: attr, depth: 1}
+                    newTable.nodes.push(newNode)
+                    g.addNode(newNode)
+
+                    g.addEdge({nodes: [selectTable.nodes.find(n => n.name == attr && !g.edges.find(e => e.nodes[0] == n)), newNode]})
+                }
+            } else {
+                let attrname = ""
+                let talias = ""
+
+                if (el2.value.includes(".")){
+                    attrname = el2.value.split(".")[1]
+                    talias = el2.value.split(".")[0]
+                } else attrname = el2.value
+
+                if (el2.value.includes(".*")){
+                    if (newTable.tablealias != el2.value.split(".")[0] && newTable.name != el2.value.split(".")[0]) continue;
+
+                    for (let attr of attrsInNewTableFromSchema){
+                        let newNode = {name: attr, depth: 0, tablealias: newTable.tablealias}
+                        g.addNode(newNode)
+                        newTable.nodes.push(newNode)
+
+                        let leftNode = {name: attr, depth: 0}
+                        g.addNode(leftNode);
+                        selectTable.nodes.push(leftNode);
+
+                        g.addEdge({nodes: [leftNode, newNode]})
+                    }
+                } else {
+                    if (!attrsInNewTableFromSchema.includes(attrname)) continue;
+
+                    if (talias == "" || talias == newTable.tablealias){
+                        let newNode = {name: attrname, depth: 0, tablealias: newTable.tablealias}
+                        newTable.nodes.push(newNode)
+                        g.addNode(newNode)
+
+                        let leftNode = selectTable.nodes.find(n => n.name == newNode.name)
+                        let rightNode = newNode
+
+                        if (leftNode!=undefined && rightNode!=undefined) g.addEdge({nodes: [leftNode, rightNode]})
+                    }
+                }
+
+                
+            }  
+        }
+
+        g.addGroup(newTable)
+    }
+}
+
+let getAttrInTable = (g, node) => {
+    let tableidentifier = node.value.split(".")[0]
+    let attrname = node.value.split(".")[1]
+
+    let t = g.groups.find(gr => gr.tablealias == tableidentifier)
+    let attr = t.nodes.find(n => n.name == attrname)
+    if (attr == undefined){
+        attr = {name: attrname, depth: 0, table: t}
+        t.nodes.push(attr)
+        g.addNode(attr)
+    }
+
+    return attr
+}
+
+let manageSubQuery = (g, astNode, subquerytype, othernode) => {
+    console.log("AST NODE", astNode)
+    subquerycount += 1;
+
+    if (subquerytype == "negate") subquerymap[subquerycount] = "negate"
+    else if (subquerytype == "ALL") subquerymap[subquerycount] = "ALL"
+
+    for (let el of astNode.from.value){
+        let ref = el.value
+        let refName = ref.value.value
+        let refAlias = ref.alias.value
+
+        if (g.groups.find(gr => gr.grouptype == "table" && gr.tablealias == refAlias)) continue;
+        else {
+            let newTable = {nodes: [], name: refName, tablealias: refAlias, grouptype: "table", subqueryid: subquerycount}
+            g.addGroup(newTable)
+        }
+    }
+
+    if (subquerytype == "ALL"){
+        for (let el of astNode.selectItems.value){
+            if (el.value.includes("*")) continue;
+            let attr1 = getAttrInTable(g, el)
+            let attr2 = getAttrInTable(g, othernode)
+
+            g.addEdge({nodes: [attr1, attr2]})
+        }
+    }
+    
+    let newnodes = []
+
+    if (astNode.where != undefined) {
+        newnodes = manageWhere(g, astNode.where);
+    }
+
+    return newnodes
+}
+
+let manageWhere = (g, astNode) => {
+    
+    let getAttrInTable = (table, attrname) => {
+        let res = table.nodes.find(n => n.name == attrname);
+        if (res != undefined) return res;
+        else {
+            newNode = {name: attrname, depth: 0, table: table}
+            table.nodes.push(newNode);
+            g.addNode(newNode);
+            return newNode;
+        }
+    }
+
+    let exploreNode = (node) => {
+        // console.log(exploring )
+
+        if (node.type == "AndExpression"){
+            let newnodes1 = exploreNode(node.left);
+            let newnodes2 = exploreNode(node.right);
+            if (newnodes1 != undefined && newnodes2 != undefined) return newnodes1.concat(newnodes2)
+        } else if (node.type == "NotExpression") {
+            return manageSubQuery(g, node.value.value, "negate") // ADD NEGATION
+        } else if (node.type == "SubQuery") {
+            return manageSubQuery(g, node.value);
+        } else if (node.type == "ComparisonSubQueryBooleanPrimary") {
+            return manageSubQuery(g, node.right, "ALL", node.left);
+        } else if (node.type == "ComparisonBooleanPrimary") {
+            let leftElem = node.left.value;
+            let rightElem = node.right.value;
+
+            if (node.left.type == "Identifier" && node.right.type == "Identifier"){
+
+                let leftTableName = leftElem.split(".")[0]
+                let rightTableName = rightElem.split(".")[0]
+                let leftAttrName = leftElem.split(".")[1]
+                let rightAttrName = rightElem.split(".")[1]
+
+                let leftTable = g.groups.find(gr => gr.grouptype == "table" && (gr.name == leftTableName || gr.tablealias == leftTableName))
+                let rightTable = g.groups.find(gr => gr.grouptype == "table" && (gr.name == rightTableName || gr.tablealias == rightTableName))
+
+                if (leftTable == undefined) {
+                    let schemaEntry = schema.split('\n').find(l => l.split("(")[1].replace(")").split(",").find(el => el.trim() == leftTableName)).split('(')[0]
+                    leftTable = g.groups.find(gr => gr.grouptype == "table" && (gr.name == schemaEntry))
+                    leftAttrName = leftTableName;
+                } 
+                if (rightTable == undefined) {
+                    let schemaEntry = schema.split('\n').find(l => l.split("(")[1].replace(")").split(",").find(el => el.trim() == rightTableName)).split('(')[0]
+                    rightTable = g.groups.find(gr => gr.grouptype == "table" && (gr.name == schemaEntry))
+                    rightAttrName = rightTableName;
+                }
+
+                let leftTableAttr = getAttrInTable(leftTable, leftAttrName);
+                let rightTableAttr = getAttrInTable(rightTable, rightAttrName);
+
+                g.addEdge({nodes: [leftTableAttr, rightTableAttr], operator: node.operator})
+
+                return [leftTableAttr, rightTableAttr]
+            } else if (node.left.type == "Identifier" && node.right.type != "Identifier") {
+
+                let leftTableName = leftElem.split(".")[0]
+                let leftAttrName = leftElem.split(".")[1]
+
+                let leftTable = g.groups.find(gr => gr.grouptype == "table" && (gr.name == leftTableName || gr.tablealias == leftTableName))
+                newNode = {name: leftAttrName + " " + node.operator + " " + node.right.value, depth: 0, table: leftTable, nodetype: "constraint"}
+                g.addNode(newNode)
+                leftTable.nodes.push(newNode)
+            }
+
+            
+        }
+    }
+
+    return exploreNode(astNode);
+}
+
+let getAttrsFromSchema = (tname, schema) => schema.split("\n").find(l => l.includes(tname)).split("(")[1].replace(")", "").replace(" ", "").split(",")
+
+let container = d3.select("body").append("div").attr("class", "container-fluid")
+
+let count = 0;
+let subquerycount = 0;
+// let subquerymap = {}
+
+for (let i in QUERY){
+    subquerycount = 0;
+    subquerymap = {};
+    if (count < 30) {count++; continue;}
+
+    console.log("QUERY NUM: ", count)
+    query = QUERY[i];
+    if (i < 201) schema = SCHEMA["Bars"]; 
+    else if (i < 301) schema = SCHEMA["IMDB"]
+    else if (i < 401) schema = SCHEMA["Sailors"]
+    else if (i < 501) schema = SCHEMA["Belief worlds"]
+    else schema = SCHEMA["Abstract"]
+    if (query == undefined || query.length == 0) continue;
+
+    let ast = sqlParser.parse(query);
+    console.log(ast)
+
+    let row = container.append("div").attr("class", "row row-divided np-element").style("align-items", "center")
+
+    row.append("div").text(count)
+
+    row.append("div").attr("class", "col-sm").append("pre").text(query)
+
+    let g = new SimpleGraph();
+
+    let selectTable = {nodes: [], name: "SELECT", grouptype: "table"}
+    g.addGroup(selectTable)
+
+    // MANAGE SELECT
+    manageSelect(g, ast, selectTable);
+  
+    // MANAGE FROM
+    try {
+        manageFrom(g, ast, selectTable);
+    } catch (error) {
+        console.log(error, query, g)
+    }
+    
+    // MANAGE WHERE
+
+    try {
+        if (ast.value.where != null)
+            manageWhere(g, ast.value.where, schema)
+    } catch (error) {console.log(error, query, g)}
+
+    // DEFINE SUBQUERIES    
+
+    for (let q=0; q<=subquerycount; q++){
+        let subqgroup = g.groups.filter(gr => gr.grouptype == "table" && gr.subqueryid == q)
+        if (subqgroup.length == 0) continue;
+        else if (subqgroup.length == 1){
+            if (subquerymap[q] == "negate") subqgroup[0].negateSingleTable = true;
+            else if (subquerymap[q] == "ALL") subqgroup[0].allSingleTable = true;
+        } else {
+            let newGroup;
+            if (subquerymap[q] == "negate") newGroup = {nodes: [], grouptype: "negated_subquery"};
+            else if (subquerymap[q] == "negate") newGroup = {nodes: [], grouptype: "all_subquery"};
+            else newGroup = {nodes: [], grouptype: "subquery"};
+            newGroup.nodes = subqgroup.map(d => d.nodes).flat()
+            g.addGroup(newGroup);
+        }
+    }
+
+    for (let group of g.groups.filter(gr => gr.grouptype == "table")){
+        group.restricted_vertically = true;
+        group.restricted_height = group.nodes.length;
+    }
+
+    // ASSIGN RANKS
+
+    assignRanks(g, selectTable);
+
+    // g.addAnchors();
+
+    // RUN ALGORITHM
+
+    try {
+        runSimpleLpWorker(g, row, i)
+    } catch (error) {console.log("ERROR IN QUERY " + count + "\n", error)}
+
+    let wrong = [30, 31, 32]
+    if (wrong.includes(count)) row.style("background-color", "#FCC")
+
+    if (count == 35) break;
+    count++;
+}
+
+async function runSimpleLpWorker(g, row, qindex) {
+        let myWorker = new Worker('./js/worker_lp.js')
+
+        let options = {
+            bendiness_reduction_active: true,
+            crossings_reduction_active: true,
+            simplify_for_groups_enabled: false,
+            group_distance: 2
+        }
+
+        myWorker.postMessage({
+            'cmd': "", 
+            'graph': g,
+            'algorithm_options': options});
+        let finished = false;
+
+        let algorithm;
+
+        myWorker.addEventListener('message', (msg) => {
+            finished = true;
+            algorithm = msg.data.algorithm;
+
+            let g = msg.data.graph
+
+            let svg = row.append("div").attr("class", "col-md").append("svg").attr("width", "100%")
+            try { drawQuery(svg, g, 200, 20) } catch (error) {console.log(error)}
+
+            row.append("div").attr("class", "col-sm").style("text-align", "center")
+                .append("img").attr("src", "./qv_pics/" + qindex + ".png")
+                .style("max-width", "50%").style("padding", "3%")
+        });
+
+        setTimeout(() => {
+            myWorker.terminate()
+            if (!finished) console.log('worker terminated')
+        }, 1000000);
+    }
+
+</script>

@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="https://getbootstrap.com/docs/4.0/assets/img/favicons/favicon.ico">
+
+    <title>Stratisfimal Layout</title>
+
+    <link href="./css/neumorph.min.css" rel="stylesheet">
+
+    <link rel="canonical" href="https://getbootstrap.com/docs/4.0/examples/starter-template/">
+
+    <!-- Bootstrap core CSS -->
+    <link href="./css/bootstrap.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="./css/starter-template.css" rel="stylesheet">
+
+    <script src="./lib/seedrandom.min.js"></script>
+    <script src="./lib/d3.v5.min.js"></script>
+    <script src="./lib/glpk.min.js"></script>
+
+    <script src="./simple/simplegraph.js"></script>
+    <script src="./simple/simpleLp.js"></script>
+    <script src="./simple/testCaseGenerator.js"></script>
+
+    <script src="./js/GroupCreation.js"></script>
+    <script src="./js/readFromJson.js"></script>
+    <script src="./js/GroupCreation.js"></script>
+
+    </style>
+  </head>
+    <svg id="vis-svg"></svg>
+  <body>
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <!-- <script src="./lib/jquery-3.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script> -->
+    <!-- <script>window.jQuery || document.write('<script src="../../assets/js/vendor/jquery-slim.min.js"><\/script>')</script> -->
+    <!-- <script src="./lib/popper.js"></script> -->
+    <!-- <script src="./lib/bootstrap.js"></script> -->
+  
+</body>
+
+<script>
+
+let drawQuery = (svg, graph, nodeXDistance = 50, nodeYDistance = 50) => {
+
+    let getNodeCoordX = (node) => (150 + nodeXDistance * (node.depth));
+    let getNodeCoordY = (node) => {
+        let nbuffer = 0;
+        let tmpgroups = graph.groups.filter(gr => gr.nodes.find(n => n.depth == node.depth))
+        tmpgroups.sort((a, b) => parseFloat(graph.nodeIndex[node.depth].indexOf(a.nodes[0])) > parseFloat(graph.nodeIndex[node.depth].indexOf(b.nodes[0])))
+        nbuffer += tmpgroups.indexOf(graph.groups.find(gr => gr.nodes.includes(node)))*(nodeYDistance*2)
+        if (node.y != undefined) return 150 + node.y * nodeYDistance;
+        else return nodeYDistance + parseFloat(20 + nbuffer + graph.nodeIndex[node.depth].indexOf(node) * nodeYDistance)
+    };
+    let line = d3.line().curve(d3.curveBasis);
+    let colors = ['#303E3F', '#A3B9B6'];
+
+    for (let edge of graph.edges){
+        svg.append('path')
+            .attr('class', 'edgepath')
+            .attr('fill', 'none')
+            .attr('stroke', 'black')
+            .attr('stroke-width', 1)
+            .attr('d', () => {
+                let m = 0;
+                let s1 = 0;
+                let s2 = 0;
+                let isSameRankEdge = edge.nodes[0].depth == edge.nodes[1].depth
+                if (isSameRankEdge) m = nodeXDistance*.2 + (Math.abs(getNodeCoordY(edge.nodes[0]) - getNodeCoordY(edge.nodes[1]))/(nodeYDistance/2));
+                else {
+                    s1 = nodeXDistance*.4;
+                    s2 = -nodeXDistance*.4;
+                }
+                return line([
+                    [getNodeCoordX(edge.nodes[0]) + 100, getNodeCoordY(edge.nodes[0])], 
+                    [getNodeCoordX(edge.nodes[0]) + m + s1, getNodeCoordY(edge.nodes[0])], 
+                    [getNodeCoordX(edge.nodes[1]) + m + s2, getNodeCoordY(edge.nodes[1])],
+                    [getNodeCoordX(edge.nodes[1]) + (isSameRankEdge? + 100 : - 100), getNodeCoordY(edge.nodes[1])]
+                ])
+            })
+    }
+
+    for (let group of graph.groups){
+        let topnode = group.nodes.sort((a, b) => getNodeCoordY(a) > getNodeCoordY(b))[0]
+        // console.log(graph.nodeIndex[group.nodes[0].depth])
+
+        let g = svg.append('g')
+            .attr('transform', 'translate(' + (getNodeCoordX(topnode)) + ',' + (getNodeCoordY(topnode) - nodeYDistance) +')')
+        
+        g.append("rect")
+            .attr('height', nodeYDistance)
+            .attr("width", 200)
+            .attr('x', -100)
+            .attr('y', -nodeYDistance/2)
+            .attr('stroke-width', 1)
+            .attr("stroke", "black")
+            .attr("fill", "black")
+
+        g.append('text')
+            .text(group.name)
+            .attr('text-anchor', 'middle')
+            .style("font-family", "Arial")
+            .attr('y', 3)
+            .attr('fill', "white")
+            .style('font-size', '0.7em')
+            .style("font-weight", "bold")
+    }
+
+    for (let depth in graph.nodeIndex){
+        for (let node of graph.nodeIndex[depth]){
+
+            let g = svg.append('g')
+                .attr('transform', 'translate(' + (getNodeCoordX(node)) + ',' + getNodeCoordY(node) +')')
+                .attr('opacity', () => {return node.type == "fake"? 0.3 : 1})
+
+            g.append('rect')
+                .datum(node)
+                .attr('class', 'node')
+                .attr('height', nodeYDistance)
+                .attr("width", 200)
+                .attr('x', -100)
+                .attr('y', -nodeYDistance/2)
+                .attr('stroke-width', 1)
+                .attr("stroke", "black")
+                .attr('fill', node.drawtype == "constraint"? "#FFFF99" : "none")
+
+            g.append('text')
+                .text(node.name)
+                .attr('text-anchor', 'middle')
+                .style("font-family", "Arial")
+                .attr('y', 3)
+                .attr('fill', node.drawtype == "th"? "white" : "black")
+                .style('font-size', '0.7em')
+                .style("font-weight", "bold")
+        }
+    }
+}
+
+    let g = new SimpleGraph();
+    let forceOrderList = [];
+
+    let nameCount = 0;
+
+    let selectNodes = [
+            // {name: "SELECT", drawtype: "th"},
+            {name: "client_account_nbr"},
+            {name: "client_reprint_key"},
+            {name: "mail_class_cd"},
+            {name: "imb_id"},
+            {name: "client_reported_mail_dt"},
+            {name: "sheet_cnt"},
+            {name: "ncoa_link_return_code"},
+            {name: "ncoa_link_move_type"},
+            {name: "ncoa_primary_address"},
+            {name: "ncoa_secondary_address"},
+            {name: "ncoa_city"},
+            {name: "ncoa_state"},
+            {name: "ncoa_zip"},
+            {name: "ncoa_zip4"},
+            {name: "ncoa_dpbc"},
+            {name: "ncoa_carrier_route"},
+            {name: "ncoa_move_effective_date"},
+            {name: "ncoa_cass_error"},
+            {name: "ncoa_cass_status_code"},
+            {name: "ncoa_dpv_foot_note"},
+            {name: "ncoa_dpv_status"},
+            {name: "ncoa_dpv_match_code"},
+            {name: "ncoa_lacslink_indicator"},
+            {name: "ncoa_lacslink_return_code"},
+            {name: "ncoa_lacslink_record_type"},
+            {name: "ncoa_suitelink_return_code"},
+            {name: "ncoa_pr_urban_name"},
+        ]
+
+    for (let node of selectNodes) {
+        node.depth = 0;
+        node.id = "u" + nameCount++;
+        // node.name = node.id;
+    }
+
+    let selectGroup = {nodes: selectNodes, name: "SELECT"}
+
+    g.addNodes(selectNodes);
+    g.addGroup(selectGroup);
+
+    let PBFHNNodes = [
+        // {name: "package_bso_file_hma_ncoa", drawtype: "th"},
+        {name: "client_account_nbr_1"},
+        {name: "client_reprint_key_1"},
+        {name: "ncoa_link_return_code_1"},
+        {name: "ncoa_link_move_type_1"},
+        {name: "ncoa_primary_address_1"},
+        {name: "ncoa_secondary_address_1"},
+        {name: "ncoa_city_1"},
+        {name: "ncoa_state_1"},
+        {name: "ncoa_zip_1"},
+        {name: "ncoa_zip4_1"},
+        {name: "ncoa_dpbc_1"},
+        {name: "ncoa_carrier_route_1"},
+        {name: "ncoa_move_effective_date_1"},
+        {name: "ncoa_cass_error_1"},
+        {name: "ncoa_cass_status_code_1"},
+        {name: "ncoa_dpv_foot_note_1"},
+        {name: "ncoa_dpv_status_1"},
+        {name: "ncoa_dpv_match_code_1"},
+        {name: "ncoa_lacslink_indicator_1"},
+        {name: "ncoa_lacslink_return_code_1"},
+        {name: "ncoa_lacslink_record_type_1"},
+        {name: "ncoa_suitelink_return_code_1"},
+        {name: "ncoa_pr_urban_name_1"},
+        {name: "package_bso_file_id_1"},
+        {name: "partition_dt_1"},
+    ]
+
+    for (let node of PBFHNNodes) {
+        node.depth = 1;
+        node.id = "u" + nameCount++;
+        // node.name = node.id;
+    }
+
+    let PBFHGroup = {nodes: PBFHNNodes, name: "package_bso_file_hma_ncoa"}
+
+    g.addNodes(PBFHNNodes);
+    g.addGroup(PBFHGroup);
+
+    for (let n1 of selectNodes){
+        let n2 = PBFHNNodes.find(n => n.name.substring(0, n.name.length - 2) == n1.name)
+        if (n2 != undefined) g.addEdge({nodes: [n1, n2]})
+    }
+
+    let PHNodes = [
+        // {name: "package_h", drawtype: "th"},
+        {name: "sheet_cnt_2"},
+        {name: "run_id_2"},
+        {name: "partition_dt_2"},
+        {name: "plan_cd_2"},
+        {name: "original_seq_2"},
+        {name: "package_id_2"}
+    ]
+
+    for (let node of PHNodes) {
+        node.id = "u" + nameCount++;
+        node.depth = 1;
+        // node.name = node.id;
+    }
+
+    g.addNodes(PHNodes);
+    g.addGroup({nodes: PHNodes, name: "package_h"});
+    g.addEdge({nodes: [selectNodes.find(n => n.name == "sheet_cnt"), PHNodes.find(n => n.name == "sheet_cnt_2")]})
+
+    // PACKAGE_BSO_FILE
+    // ***********
+    // 
+    let RHNodes = [
+        // {name: "run_h", drawtype: "th"},
+        {name: "mail_class_cd_3"},
+        {name: "run_id_3"},
+        {name: "partition_dt_3"},
+        {name: "run_id = 3", drawtype: "constraint"},
+        {name: "partition_dt = 4", drawtype: "constraint"}
+    ]
+
+    for (let node of RHNodes) {
+        node.depth = 1;
+        node.id = "u" + nameCount++;
+    }
+
+    for (let n1 of RHNodes.filter(n => n.drawtype == "constraint")){
+        for (let n2 of RHNodes.filter(n => n.drawtype != "constraint")){
+            forceOrderList.push([n2, n1])
+        }
+    }
+
+    g.addNodes(RHNodes);
+    g.addGroup({nodes: RHNodes, name: "run_h"});
+    g.addEdge({nodes: [selectNodes.find(n => n.name == "mail_class_cd"), RHNodes.find(n => n.name == "mail_class_cd_3")]})
+    g.addEdge({nodes: [PHNodes.find(n => n.name == "run_id_2"), RHNodes.find(n => n.name == "run_id_3")]})
+    g.addEdge({nodes: [PBFHNNodes.find(n => n.name == "partition_dt_1"), RHNodes.find(n => n.name == "partition_dt_3")]})
+
+    // PACKAGE_BSO_FILE
+    // ***********
+    // OK
+    let PBFNodes = [
+        // {name: "package_bso_file", drawtype: "th"},
+        {name: "partition_dt_4"},
+        {name: "package_bso_file_id_4"},
+        {name: "bso_file_id_4"},
+        {name: "original_seq_4"},
+        {name: "imb_id_4"}
+    ]
+
+    for (let node of PBFNodes) {
+        node.depth = 1;
+        node.id = "u" + nameCount++;
+    }
+
+    g.addNodes(PBFNodes);
+    g.addGroup({nodes: PBFNodes, name: "package_bso_file"});
+    g.addEdge({nodes: [selectNodes.find(n => n.name == "imb_id"), PBFNodes.find(n => n.name == "imb_id_4")]})
+    g.addEdge({nodes: [PBFHNNodes.find(n => n.name == "package_bso_file_id_1"), PBFNodes.find(n => n.name == "package_bso_file_id_4")]})
+    g.addEdge({nodes: [PHNodes.find(n => n.name == "original_seq_2"), PBFNodes.find(n => n.name == "original_seq_4")]})
+    g.addEdge({nodes: [PBFHNNodes.find(n => n.name == "partition_dt_1"), PBFNodes.find(n => n.name == "partition_dt_4")]})
+
+    // PACKAGE_MILESTONE
+    // ***********
+    // OK
+    let PMNodes = [
+        // {id: "package_milestone", drawtype: "th"},
+        {name: "client_reported_mail_dt_5"},
+        {name: "partition_dt_5"},
+        {name: "package_id_5"},
+    ]
+
+    for (let node of PMNodes) {
+        node.depth = 1;
+        node.id = "u" + nameCount++;
+    }
+
+    g.addNodes(PMNodes);
+    g.addGroup({nodes: PMNodes, name: "package_milestone"});
+    g.addEdge({nodes: [PHNodes.find(n => n.name == "partition_dt_2"), PMNodes.find(n => n.name == "partition_dt_5")]})
+    g.addEdge({nodes: [PHNodes.find(n => n.name == "package_id_2"), PMNodes.find(n => n.name == "package_id_5")]})
+    g.addEdge({nodes: [selectNodes.find(n => n.name == "client_reported_mail_dt"), PMNodes.find(n => n.name == "client_reported_mail_dt_5")]})
+
+    // BSO_FILE
+    // ***********
+    // OK
+    let BFNodes = [
+        // {id: "bso_file", drawtype: "th"},
+        {name: "partition_dt_6"},
+        {name: "bso_file_id_6"},
+        {name: "bso_file_id = 1", drawtype: "constraint"},
+        {name: "partition_dt = 2", drawtype: "constraint"}
+    ]
+
+    for (let node of BFNodes) {
+        node.depth = 2;
+        node.id = "u" + nameCount++;
+    }
+
+    for (let n1 of BFNodes.filter(n => n.drawtype == "constraint")){
+        for (let n2 of BFNodes.filter(n => n.drawtype != "constraint")){
+            forceOrderList.push([n2, n1])
+        }
+    }
+
+    g.addNodes(BFNodes);
+    g.addGroup({nodes: BFNodes, name: "bso_file"});
+    g.addEdge({nodes: [PBFNodes.find(n => n.name == "partition_dt_4"), BFNodes.find(n => n.name == "partition_dt_6")]})
+    g.addEdge({nodes: [PBFNodes.find(n => n.name == "bso_file_id_4"), BFNodes.find(n => n.name == "bso_file_id_6")]})
+
+    // RUN_PLAN_H
+    // ***********
+    // OK
+    let RPHNodes = [
+        // {id: "run_plain_h", drawtype: "th"},
+        {name: "run_id_7"},
+        {name: "partition_dt_7"},
+        {name: "plan_cd_7"},
+        {name: "plan_type_cd_7"}
+        // {id: }
+    ]
+
+    for (let node of RPHNodes) {
+        node.depth = 2;
+        node.id = "u" + nameCount++;
+    }
+
+    g.addNodes(RPHNodes);
+    g.addGroup({nodes: RPHNodes, name: "run_plan_h"});
+    g.addEdge({nodes: [RHNodes.find(n => n.name == "run_id_3"), RPHNodes.find(n => n.name == "run_id_7")]})
+    g.addEdge({nodes: [RHNodes.find(n => n.name == "partition_dt_3"), RPHNodes.find(n => n.name == "partition_dt_7")]})
+    g.addEdge({nodes: [PHNodes.find(n => n.name == "plan_cd_2"), RPHNodes.find(n => n.name == "plan_cd_7")]})
+
+    let PTRNodes = [
+        // {id: "plan_type_r", drawtype: "th"},
+        {name: "plan_type_cd_8"},
+    ]
+
+    // PLAN_TYPE_R
+    // ***********
+    // OK
+    for (let node of PTRNodes) {
+        node.depth = 3;
+        node.id = "u" + nameCount++;
+    }
+
+    g.addNodes(PTRNodes);
+    g.addGroup({nodes: PTRNodes, name: "plan_type_r"});
+    g.addEdge({nodes: [RPHNodes.find(n => n.name == "plan_type_cd_7"), PTRNodes.find(n => n.name == "plan_type_cd_8")]})
+
+    algorithm = new SimpleLp(g);
+    algorithm.options.bendiness_reduction_active = false;
+    algorithm.options.simplify_for_groups_enabled = true;
+
+    for (let p of forceOrderList)
+        algorithm.forceOrder(p[0], p[1]);
+
+    // algorithm.options.keep_groups_re
+    algorithm.arrange();
+    algorithm.apply_solution();
+
+    let gsvg = d3.select("#vis-svg")
+        .attr("width", 3000)
+        .attr("height", 3000)
+    drawQuery(gsvg, g, 500, 20)
+
+</script>

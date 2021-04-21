@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="https://getbootstrap.com/docs/4.0/assets/img/favicons/favicon.ico">
+
+    <title>Stratisfimal Layout</title>
+
+    <link href="./css/neumorph.min.css" rel="stylesheet">
+
+    <link rel="canonical" href="https://getbootstrap.com/docs/4.0/examples/starter-template/">
+
+    <!-- Bootstrap core CSS -->
+    <link href="./css/bootstrap.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="./css/starter-template.css" rel="stylesheet">
+
+    <script src="./lib/seedrandom.min.js"></script>
+    <script src="./lib/d3.v5.min.js"></script>
+    <script src="./lib/glpk.min.js"></script>
+
+    <script src="./simple/simplegraph.js"></script>
+    <script src="./simple/simpleLp.js"></script>
+    <script src="./simple/testCaseGenerator.js"></script>
+
+    <script src="./js/GroupCreation.js"></script>
+    <script src="./js/readFromJson.js"></script>
+    <script src="./js/GroupCreation.js"></script>
+
+    <style>
+      #randomgroupGenDiv{
+        margin-bottom: 2em;
+      }
+
+      .roundedCornerImg{
+      background-color: #eed;
+      border-radius:25px;
+      margin: 20px;
+    }
+
+    pre {
+      background-color: #ddd;
+      border-radius: 10px;
+      margin: 20px;
+      padding: 10px;
+    }
+
+    .premodel {
+      white-space: pre-wrap;
+      font-size: x-small;
+      text-align: left;
+      max-height: 400px;
+    }
+
+    .loader,
+    .loader:before,
+    .loader:after {
+      border-radius: 50%;
+      width: 2.5em;
+      height: 2.5em;
+      -webkit-animation-fill-mode: both;
+      animation-fill-mode: both;
+      -webkit-animation: load7 1.8s infinite ease-in-out;
+      animation: load7 1.8s infinite ease-in-out;
+    }
+    .loader {
+      color: #3b3b3b;
+      font-size: 10px;
+      margin: 80px auto;
+      position: relative;
+      text-indent: -9999em;
+      -webkit-transform: translateZ(0);
+      -ms-transform: translateZ(0);
+      transform: translateZ(0);
+      -webkit-animation-delay: -0.16s;
+      animation-delay: -0.16s;
+    }
+    .loader:before,
+    .loader:after {
+      content: '';
+      position: absolute;
+      top: 0;
+    }
+    .loader:before {
+      left: -3.5em;
+      -webkit-animation-delay: -0.32s;
+      animation-delay: -0.32s;
+    }
+    .loader:after {
+      left: 3.5em;
+    }
+    @-webkit-keyframes load7 {
+      0%,
+      80%,
+      100% {
+        box-shadow: 0 2.5em 0 -1.3em;
+      }
+      40% {
+        box-shadow: 0 2.5em 0 0;
+      }
+    }
+    @keyframes load7 {
+      0%,
+      80%,
+      100% {
+        box-shadow: 0 2.5em 0 -1.3em;
+      }
+      40% {
+        box-shadow: 0 2.5em 0 0;
+      }
+    }
+
+    </style>
+  </head>
+
+  <body>
+
+    <main role="main" class="container">
+
+      <div class="starter-template">
+        <h1>Stratisfimal Layout!</h1>
+        <p>The layout of a node-link network visualization deeply influences how readable the network topology is. 
+          When trying to find a suitable algorithm for network layout, one can decide to either focus on scalability or optimality. 
+          In this paper, we focus on the latter, which is especially important as optimal solutions are not only the best attainable result, but they can also be used as a baseline to test the effectiveness of methods which do not guarantee optimality (such as methods based on heuristics, which instead focus on scalability). 
+          In the past, efforts towards optimal layout algorithms have been centered on crossing reduction, but networks can have a wide number of properties which may need to be taken into account, and there are more readability criteria other than having the smallest possible number of crossings.
+          We make an important step towards achieving this goal by proposing a modular integer linear programming formulation for layered network layout that can take into account a number of readability criteria suggested in the past (e.g., crossing reduction, edge bendiness, nested and multi-rank grouping) that can all be solved simultaneously. 
+          Our method can be adapted to numerous, different use cases due to its modularity, which allows for modules to be cherry-picked according to which features are needed.</p>
+        <br><br>
+          <svg id="graph1" viewBox="0 0 350 250"></svg>
+
+          <h1>Features</h1>
+          <ul>
+            <li>Crossing reduction in layered node-link network visualizations</li>
+            <li>Bendiness reduction</li>
+            <li>Manages single-rank, multi-rank and nested groups</li>
+            <li>Always finds the optimal solution</li>
+          </ul>
+        
+          <h1 style="margin-top: 2em;">Resources</h1>
+        <div class="row"><img src="./images/screenshot1.png" class="col-sm np-element roundedCornerImg"><img src="./images/screenshot2.png" class="col-sm np-element roundedCornerImg"></div>
+        <a href="./proofs.html">All formulas explained</a>, with examples, full formulations and edge cases.<br>
+        <div class="row"><img src="./images/screenshot3.png" class="col-sm np-element roundedCornerImg"><img src="./images/screenshot4.png" class="col-sm np-element roundedCornerImg"></div>
+        <a href="./benchmark.html">The method applied to the first 79 networks in Rome-Lib</a>, comparing various configurations. <br>
+        <div class="row"><img src="./images/screenshot5.png" class="col-sm np-element roundedCornerImg"><img src="./images/screenshot6.png" class="col-sm np-element roundedCornerImg"></div>
+        <a href="./qv.html">Comparison against other layout algorithms applied to QueryVis</a><br>
+
+        <h1 style="margin-top: 2em">Try it yourself</h1>
+        <p><i>Note: the result is computed in your browser, so it might take some time.</i></p><br>
+
+        <div class="card border-primary mb-3" style="padding: 20px">
+        <div id="accordion">
+          <div id="randomGroupGenDiv" class="card">
+            <div class="card-header" id="headingOne">
+              <h5 class="mb-0">
+                <button class="btn btn-link" data-toggle="collapse" onclick="readfromJson=!readfromJson" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+                  Generate a random network
+                </button>
+              </h5>
+            </div>
+
+            <div id="collapseOne" class="collapse show" aria-labelledby="headingOne" data-parent="#accordion">
+              <div class="card-body">
+                <div class="input-group mb-3">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text" id="basic-addon1">Seed</span>
+                  </div>
+                  <input type="text" class="form-control" placeholder="random seed" aria-label="seed" aria-describedby="basic-addon1" onchange="console.log('seed changed'); sandboxOptions.seed = this.value">
+                </div>
+      
+                <div style="display: inline-flex; width:100%">
+                  <div class="col-sm">Max depth</div>
+                  <input style="margin-left: 5%; margin-right:5%; width:100%" class="col-md" type="range" class="form-range" id="maxDepth" min="2" max="7" step="1" value="" onchange="sandboxOptions.maxDepth = this.value; document.getElementById('maxdval').innerHTML = this.value;">
+                  <div id='maxdval' class="col-sm">4</div>
+                </div>
+      
+                <div style="display: inline-flex; width: 100%">
+                  <div class="col-sm">Max nodes per rank</div>
+                  <input class="col-md" style="margin-left: 5%; margin-right:5%; width:100%" type="range" class="form-range" id="maxNodesPerDepth" min="2" max="5" step="1" value="" onchange="sandboxOptions.maxNodesPerRank = this.value; document.getElementById('maxrval').innerHTML = this.value;">
+                  <div id='maxrval' class="col-sm">4</div>
+                </div>
+      
+                <div style="display: inline-flex; width: 100%">
+                  <div class="col-sm">Node distribution</div>
+                  <input class="col-md" style="margin-left: 5%; margin-right:5%; width:100%" type="range" class="form-range" id="nodeDistribution" min="0.2" max="1" step="0.1" value="" onchange="sandboxOptions.children_prob = this.value; document.getElementById('ndval').innerHTML = this.value;">
+                  <div id='ndval' class="col-sm">4</div>
+                </div>
+      
+                <div style="display: inline-flex; width: 100%">
+                  <div class="col-sm">Random edge distribution</div>
+                  <input class="col-md" style="margin-left: 5%; margin-right:5%; width:100%" type="range" class="form-range" id="randomEdgeDistribution" min="0" max="0.5" step="0.1" value="" onchange="sandboxOptions.random_edge_prob = this.value; document.getElementById('aeval').innerHTML = this.value;">
+                  <div id='aeval' class="col-sm">4</div>
+                </div>
+      
+                <div style="display: inline-flex; width: 100%">
+                  <div class="col-sm">Same-rank edge distribution</div>
+                  <input class="col-md" style="margin-left: 5%; margin-right:5%; width:100%" type="range" class="form-range" id="sameRankEdgeDistribution" min="0" max="0.1" step="0.01" value="" onchange="sandboxOptions.same_rank_edge_prob = this.value; document.getElementById('seval').innerHTML = this.value;">
+                  <div id='seval' class="col-sm">4</div>
+                </div>
+    
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-header" id="headingTwo">
+                <h5 class="mb-0">
+                  <button class="btn btn-link collapsed" onclick="readfromJson=!readfromJson" data-toggle="collapse" data-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                    Read from JSON
+                  </button>
+                </h5>
+              </div>
+              <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordion">
+                <div class="card-body">
+
+                  Edit this JSON network description or paste a new one: <br>
+
+                  <button type="button" class="btn btn-primary btn-block" id="jsonerrorbutton" style="background-color:#ff000088; border:none; display:none">Error reading json file (check browser console)</button>
+
+                  <pre contenteditable="true" id="jsonDescription", style="text-align: left">
+{
+  "nodes": [
+    {"id": "u1"},
+    {"id": "u2"},
+    {"id": "u3"},
+    {"id": "u4"}
+  ],
+  "edges": [
+    {"nodes": ["u1", "u2"]},
+    {"nodes": ["u1", "u3"]},
+    {"nodes": ["u2", "u4"]}
+  ]
+}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-check" style="margin-top: 1em;">
+          <input class="form-check-input" type="checkbox" value="" id="checkboxbendinessreduction" onclick="sandboxOptions.crossing_reduction_active = this.checked">
+          <label class="form-check-label" for="flexCheckDefault">
+            Enable crossing reduction
+          </label>
+        </div>
+
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="" id="checkboxcrossingreduction" onclick="sandboxOptions.bendiness_reduction_active = this.checked">
+          <label class="form-check-label" for="flexCheckDefault">
+            Enable bendiness reduction
+          </label>
+        </div>
+
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="" id="checkboxfindgroups" onclick="sandboxOptions.autogroups = this.checked">
+          <label class="form-check-label" for="flexCheckDefault">
+            Find groups automatically
+          </label>
+        </div>
+
+        <button type="button" class="btn btn-primary btn-block" style="margin-top: 2em" onclick="genSandbox()">Generate a new graph and solve</button>
+        <button type="button" class="btn btn-primary btn-block" id="grapherrorbutton" style="background-color:#ff000088; border:none; display:none">Something went wrong (check browser console)</button>
+        </div>
+
+        Result: <br>
+        <div class="card text-center align-items-center">
+          <div style="width: 10%" id="loadingspinner" style="display: none;"><div class="loader">Loading...</div></div>
+          <button type="button" class="btn btn-primary btn-block" id="singlenodeerror" style="background-color:#ff000088; border:none; display:none">This combination of parameters created a graph with a single node. Change the parameters and try again.</button>
+          <svg id="graphsandbox" style="margin-top: 2em" viewBox="0 0 300 300"></svg>
+        
+
+          <div class="row" style="margin-top: 1em;">
+            <div class="col-md"><b>Model:</b><pre class="premodel" id="modelpre"></pre></div>
+            <div class="col-md"><b>Result:</b><pre class="premodel" id="resultpre"></pre></div>
+          </div>
+        </div>
+
+        <h1 style="margin-top: 2em">Usage</h1>
+
+        <div style="text-align: left;">Start by reading a network from a JSON file:
+          <pre><code>let g = readFromJson(file);</code></pre>
+
+          Automatically find groups of nodes (optional):
+          <pre><code>addGroups(g);</code></pre>
+
+          Initialize the algorithm:
+          <pre><code>let algorithm = new SimpleLp(g);</code></pre>
+
+          Set options for the algorithm:
+          <pre><code>let options = {crossings_reduction_weight: 1,
+  crossings_reduction_active: true,
+  bendiness_reduction_weight: 0.1,
+  bendiness_reduction_active: false,
+  simplify_for_groups_enabled: true,
+  keep_groups_rect: true
+}
+
+algorithm.options = options;</code></pre>
+
+        Run it:
+        <pre><code>algorithm.arrange();</code></pre>
+
+        Apply the solution:
+        <pre><code>algorithm.apply_solution();</code></pre>
+
+        Draw:
+        <pre><code>g.draw(svg);</code></pre>
+        <div style="text-align:center">
+
+        <h1>Authors</h1>
+        <p>
+          <a href="https://picorana.github.io/">Sara Di Bartolomeo</a>, <a href="http://www.ccs.neu.edu/home/mirek/">Mirek Riedewald</a>, <a href="">Wolfgang Gatterbauer</a>, and <a href="https://cody.khoury.northeastern.edu/">Cody Dunne</a><br>
+          A product of <a href="https://visualization.khoury.northeastern.edu/">Data Visualization &#64; Khoury</a> and the <a href="https://db.khoury.northeastern.edu/">DATA Lab</a> &#64; Northeastern University
+        </p>
+        <div class="row"><div class="col-sm"></div><img src="./images/lab_logo_husky.jpg" class="col-sm"><div class="col-sm"></div></div>
+
+
+        <h1 style="margin-top: 2em">Acknowledgements</h1> 
+        <p><a href="https://d3js.org/">d3</a>, svg management library used for drawing the networks.</p>
+        <p><a href="https://github.com/hgourvest/glpk.js">glpk.js</a>, GNU Linear Programming Kit for Javascript.</p>
+
+
+      </div>
+
+    </main><!-- /.container -->
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="./lib/jquery-3.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <!-- <script>window.jQuery || document.write('<script src="../../assets/js/vendor/jquery-slim.min.js"><\/script>')</script> -->
+    <script src="./lib/popper.js"></script>
+    <script src="./lib/bootstrap.js"></script>
+  
+</body>
+
+<script>
+
+    let testGenerator = new TestCaseGenerator();
+
+    let maxNodesPerRank = 4;
+    let maxDepth = 7;
+
+    let g = testGenerator.genRandomGraph("aae", maxNodesPerRank, maxDepth, 0.7, 0.3, 0.05)
+
+    let svg = d3.select("#graph1")
+        .attr("width", "50%")
+        .attr("height", "300px")
+        
+    let svghtml = document.getElementById("graph1")
+
+    algorithm = new SimpleLp(g);
+    algorithm.options.bendiness_reduction_active = true;
+    algorithm.options.simplify_for_groups_enabled = true;
+    algorithm.arrange();
+    algorithm.apply_solution();
+
+    // console.log(svghtml.getBBox().width)
+
+    g.draw(svg, 60, 30);
+
+    readfromJson = false;
+
+  let sandboxOptions = {
+    maxNodesPerRank : 4,
+    maxDepth : 5,
+    bendiness_reduction_active: true,
+    crossing_reduction_active: true,
+    children_prob: 0.7,
+    random_edge_prob: 0.3,
+    same_rank_edge_prob: 0.05,
+    seed: "aae",
+    autogroups: false
+  }
+
+  document.getElementById("checkboxbendinessreduction").checked = true;
+  document.getElementById("checkboxcrossingreduction").checked = true;
+  document.getElementById("checkboxfindgroups").checked = false;
+  document.getElementById("maxNodesPerDepth").value = 4
+
+  let genSandbox = () => {
+
+    let grsandbox;
+
+    document.getElementById("resultpre").innerHTML = "";
+    document.getElementById("modelpre").innerHTML = "";
+    document.getElementById("jsonerrorbutton").style.display = "none";
+    document.getElementById("grapherrorbutton").style.display = "none";
+
+    if (!readfromJson) {
+      document.getElementById("maxdval").innerHTML = document.getElementById("maxDepth").value
+      document.getElementById("maxrval").innerHTML = document.getElementById("maxNodesPerDepth").value
+      document.getElementById("ndval").innerHTML = document.getElementById("nodeDistribution").value
+      document.getElementById("aeval").innerHTML = document.getElementById("randomEdgeDistribution").value
+      document.getElementById("seval").innerHTML = document.getElementById("sameRankEdgeDistribution").value
+      sandboxOptions.maxNodesPerRank = document.getElementById("maxNodesPerDepth").value
+      sandboxOptions.maxDepth = document.getElementById("maxDepth").value
+      sandboxOptions.children_prob = document.getElementById("nodeDistribution").value
+      sandboxOptions.random_edge_prob = document.getElementById("randomEdgeDistribution").value
+      sandboxOptions.same_rank_edge_prob = document.getElementById("sameRankEdgeDistribution").value
+
+      grsandbox = testGenerator.genRandomGraph(sandboxOptions.seed, sandboxOptions.maxNodesPerRank, sandboxOptions.maxDepth, sandboxOptions.children_prob, sandboxOptions.random_edge_prob, sandboxOptions.same_rank_edge_prob)
+
+    } else {
+      try { 
+        let t = document.getElementById("jsonDescription").innerHTML.replace("'", '"')
+        grsandbox = readFromJson(JSON.parse(t));
+      } catch (e) {
+        document.getElementById("jsonerrorbutton").style.display = "block";
+        console.log(e);
+      }
+    }
+
+    if (sandboxOptions.autogroups){
+      addGroups(grsandbox);
+    }
+
+    d3.select("#graphsandbox").style('display', 'none')
+    d3.select("#singlenodeerror").style('display', 'none')
+    d3.select("#loadingspinner").style('display', 'block')
+        
+    let sandboxsvg = d3.select("#graphsandbox")
+          .attr("width", "60%")
+          .attr("height", "350px")
+
+    try {
+      algorithm = new SimpleLp(grsandbox);
+      algorithm.options.bendiness_reduction_active = sandboxOptions.bendiness_reduction_active;
+      algorithm.options.crossings_reduction_active = sandboxOptions.crossing_reduction_active;
+      algorithm.options.keep_groups_rect = false;
+      if (algorithm.options.bendiness_reduction_active) algorithm.options.simplify_for_groups_enabled = true;
+      else algorithm.options.simplify_for_groups_enabled = false;
+      
+      if (sandboxOptions.bendiness_reduction_active || sandboxOptions.crossing_reduction_active || sandboxOptions.autogroups) {
+        algorithm.arrange();
+        algorithm.apply_solution();
+        document.getElementById("modelpre").innerHTML = algorithm.modelString;
+        for (let val in algorithm.result){
+          document.getElementById("resultpre").innerHTML += val + ": " + Math.round(algorithm.result[val]) + "\n";
+        }
+      }
+
+      d3.select("#graphsandbox").attr("viewBox", "0 0 " + Math.max.apply(0, grsandbox.nodes.map(n => n.depth*50 + 40)) + " " + Math.max.apply(0, grsandbox.nodes.map(n => n.y*40 + 40)))
+      // console.log()viewBox="0 0 300 300"
+
+      d3.select("#graphsandbox").selectAll("*").remove();
+      grsandbox.draw(sandboxsvg, 50, 40)
+
+      setTimeout(function(){
+        if (grsandbox.nodes.length > 1) d3.select("#graphsandbox").style('display', 'block')
+        else {
+          d3.select("#singlenodeerror").style('display', 'block')
+        }
+        d3.select("#loadingspinner").style('display', 'none')
+      }, 500);
+    } catch (e) {
+      document.getElementById("grapherrorbutton").style.display = "block";
+      console.log(e);
+    }
+  }
+
+  genSandbox();
+
+</script>
+
+</html>

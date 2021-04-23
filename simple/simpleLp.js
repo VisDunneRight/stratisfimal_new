@@ -210,6 +210,7 @@ class SimpleLp {
                         this.model.subjectTo += " >= " + finalsum + "\n"
 
                     } else if ((this.isSameRankEdge(u1v1) && !this.isSameRankEdge(u2v2)) || (!this.isSameRankEdge(u1v1) && this.isSameRankEdge(u2v2))){
+                        
                         let theSameRankEdge, theOtherEdge;
                         if (this.isSameRankEdge(u1v1)) {
                             theSameRankEdge = u1v1;
@@ -224,7 +225,7 @@ class SimpleLp {
                         let sv = theSameRankEdge.nodes[1];
                         let no = theOtherEdge.nodes[0];
 
-                        if (!this.areElementsComparable(su, no) && !this.areElementsComparable(sv, no)) continue;
+                        if (this.options.simplify_for_groups_enabled && !this.areElementsComparable(su, no) && !this.areElementsComparable(sv, no)) continue;
 
                         let p1 = this.mkc(u1, v1, u2, v2)
                         let finalsum = 1 + this.mkxDict(" + ", no.id, su.id)[1] + this.mkxDict(" + ", sv.id, no.id)[1]
@@ -392,11 +393,13 @@ class SimpleLp {
             for (let group of this.g.groups){
                 // for each group, ytop should be above ybottom
                 this.model.subjectTo += "ytop_" + group.id + " - ybottom_" + group.id + " < " + (-1) + "\n";
+                console.log(group.name, group.restricted_vertically, group.restricted_height)
+                // if (group.restricted_vertically) this.model.subjectTo += "ybottom_" + group.id + " - ytop_" + group.id + " = " + group.restricted_height + "\n"
 
                 // every node in the group should be within the boundaries of the group, below ytop and above ybottom
                 for (let node of group.nodes){
                     this.model.subjectTo += "y_" + node.id + " - ytop_" + group.id + " >= " + (-this.options.group_distance) + "\n"
-                    this.model.subjectTo += "y_" + node.id + " - ybottom_" + group.id + " <= " + (-1 - this.options.group_distance) +"\n" 
+                    this.model.subjectTo += "y_" + node.id + " - ybottom_" + group.id + " <= " + (-1 -this.options.group_distance) +"\n" 
                 }
 
                 // find all groups spanning across the same ranks
@@ -411,7 +414,7 @@ class SimpleLp {
                     if (commonranks.size > 0) {
                         // either g2.top > g1.bottom or g2.bottom < g1.top
                         if (!this.options.simplify_for_groups_enabled){
-                            this.model.subjectTo += "ybottom_" + group2.id + " - " + this.m + " zint_" + this.zintcount + " - ytop_" + group.id + " < 0\n";
+                            this.model.subjectTo += "ybottom_" + group2.id + " - " + this.m + " zint_" + this.zintcount + " - ytop_" + group.id + " < " + (0) + "\n";
                             this.model.subjectTo += "- ytop_" + group2.id + " + " + this.m + " zint_" + this.zintcount + " + ybottom_" + group.id + " <= " + ( + this.m) + "\n";
 
                             this.zintcount += 1;
@@ -420,8 +423,7 @@ class SimpleLp {
                             let finalsum = this.mkxDict(" - ", 'g' + group.id, 'g' + group2.id, this.m, false)[1]
                             let p2 = this.mkxDict(" + ", 'g' + group.id, 'g' + group2.id, this.m, false)[0]
                             let finalsum2 = this.mkxDict(" + ", 'g' + group.id, 'g' + group2.id, this.m, false)[1]
-                            // this.model.subjectTo += "ybottom_" + group2.id + " - " + this.m + " zint_" + this.zintcount + " - ytop_" + group.id + " < 0\n";
-                            // this.model.subjectTo += "- ytop_" + group2.id + " + " + this.m + " zint_" + this.zintcount + " + ybottom_" + group.id + " <= " + (this.m) + "\n";
+
                             
                             this.model.subjectTo += "ybottom_" + group2.id + "" + p + " - ytop_" + group.id + " < " + (-finalsum) + "\n";
                             this.model.subjectTo += "- ytop_" + group2.id + "" + p2 + " + ybottom_" + group.id + " <= " + (this.m + finalsum2) + "\n";
@@ -431,13 +433,13 @@ class SimpleLp {
                 }
 
                 // minimize group span
-                if (group.restricted_vertically) this.model.subjectTo += "ybottom_" + group.id + " - ytop_" + group.id + " <= " + (group.restricted_height) + "\n"
+                if (group.restricted_vertically) this.model.subjectTo += "ybottom_" + group.id + " - ytop_" + group.id + " = " + (group.restricted_height) + "\n"
 
                 // every node not in the group should be out of the boundaries of the group, 
                 // either above ytop or below ybottom
                 if (!this.options.simplify_for_groups_enabled){
                     for (let node of this.g.nodes.filter(n => !group.nodes.includes(n) && group.nodes.map(n => n.depth).includes(n.depth))){
-                        this.model.subjectTo += "y_" + node.id + " - " + this.m + " zint_" + this.zintcount + " - ytop_" + group.id + " < -1\n";
+                        this.model.subjectTo += "y_" + node.id + " - " + this.m + " zint_" + this.zintcount + " - ytop_" + group.id + " < " + (-1 - this.options.group_distance) + "\n";
                         this.model.subjectTo += "- y_" + node.id + " + " + this.m + " zint_" + this.zintcount + " + ybottom_" + group.id + " <= " + this.m + "\n";
 
                         this.zintcount += 1;
@@ -451,7 +453,7 @@ class SimpleLp {
                         let p = this.mkxBase('g' + group.id, node.id);
                         if (this.definitions[p] != undefined){
                             this.definitions[p] = [];
-                            this.model.subjectTo += "y_" + node.id + " - " + this.m + " " + p + " - ytop_" + group.id + " < -1\n";
+                            this.model.subjectTo += "y_" + node.id + " - " + this.m + " " + p + " - ytop_" + group.id + " < " + (-1) + "\n";
                             this.model.subjectTo += "- y_" + node.id + " + " + this.m + " " + p + " + ybottom_" + group.id + " <= " + this.m + "\n";
                         } else {
                             p = this.mkxBase(node.id, 'g' + group.id);

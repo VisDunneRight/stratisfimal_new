@@ -26,11 +26,9 @@
 
     <script src="./simple/simplegraph.js"></script>
     <script src="./simple/simpleLp.js"></script>
-    <script src="./simple/testCaseGenerator.js"></script>
 
-    <script src="./js/GroupCreation.js"></script>
-    <script src="./js/readFromJson.js"></script>
-    <script src="./js/GroupCreation.js"></script>
+    <script src="./js/query_parsing/draw_query.js"></script>
+    <script src="./js/query_parsing/parse_query.js"></script>
     
     <script src="./js/query_samples/queries.js"></script>
     <style>
@@ -58,196 +56,6 @@
 </body>
 
 <script>
-
-let drawQuery = (svg, graph, nodeXDistance = 50, nodeYDistance = 50) => {
-
-    let getNodeCoordX = (node) => (150 + nodeXDistance * (node.depth));
-    let getNodeCoordY = (node) => {
-        let nbuffer = 0;
-        let tmpgroups = graph.groups.filter(gr => gr.grouptype == "table" && gr.nodes.find(n => n.depth == node.depth))
-        tmpgroups.sort((a, b) => parseFloat(graph.nodeIndex[node.depth].indexOf(a.nodes[0])) > parseFloat(graph.nodeIndex[node.depth].indexOf(b.nodes[0])))
-        nbuffer += tmpgroups.indexOf(graph.groups.find(gr => gr.grouptype == "table" && gr.nodes.includes(node)))*(nodeYDistance*2)
-        if (node.y != undefined) return 150 + node.y * nodeYDistance;
-        else return nodeYDistance + parseFloat(20 + nbuffer + graph.nodeIndex[node.depth].indexOf(node) * nodeYDistance)
-    };
-    let line = d3.line().curve(d3.curveBasis);
-    let colors = ['#303E3F', '#A3B9B6'];
-
-    let attrWidth = 100
-
-    let defs = svg.append('defs').append('marker')
-        .attr("id", "arrowhead")
-        .attr("viewBox", '0 -5 10 10')
-        .attr("refX", 8)
-        .attr("refY", 0)
-        .attr("orient", "auto")
-        .attr("markerWidth", 8)
-        .attr("markerHeight", 8)
-        .attr("xoverflow", "visible")
-        .append('svg:path')
-        .attr('d', 'M 0,-5 L 10,0 L 0,5')
-        .attr('fill', 'black')
-        .style('stroke','none');
-
-    for (let edge of graph.edges){
-        let path = svg.append('path')
-            .attr('class', 'edgepath')
-            .attr('fill', 'none')
-            .attr('stroke', 'black')
-            .attr('stroke-width', 1)
-            .attr('d', () => {
-                let m = 0;
-                let s1 = 0;
-                let s2 = 0;
-                let isSameRankEdge = edge.nodes[0].depth == edge.nodes[1].depth
-                if (isSameRankEdge) m = nodeXDistance*.2 + (Math.abs(getNodeCoordY(edge.nodes[0]) - getNodeCoordY(edge.nodes[1]))/(nodeYDistance/8));
-                else {
-                    s1 = nodeXDistance*.4;
-                    s2 = -nodeXDistance*.4;
-                }
-                return line([
-                    [getNodeCoordX(edge.nodes[0]) + attrWidth/2, getNodeCoordY(edge.nodes[0])], 
-                    [getNodeCoordX(edge.nodes[0]) + m + s1, getNodeCoordY(edge.nodes[0])], 
-                    [getNodeCoordX(edge.nodes[1]) + m + s2, getNodeCoordY(edge.nodes[1])],
-                    [getNodeCoordX(edge.nodes[1]) + (isSameRankEdge? + attrWidth/2 : - attrWidth/2), getNodeCoordY(edge.nodes[1])]
-                ])
-            })
- 
-        if (edge.operator != undefined && edge.operator != "="){
-            let pathLenght = path.node().getTotalLength()
-            let midpoint = path.node().getPointAtLength(pathLenght/2)
-
-            svg.append('circle').attr('cx', midpoint.x).attr('cy', midpoint.y).attr('r', 9).attr('fill', "#f2f3f7")
-
-            svg.append('text')
-                .attr('x', midpoint.x)
-                .attr('y', midpoint.y)
-                .attr('text-anchor', 'middle')
-                .style('font-size', '0.6em')
-                .style('dominant-baseline', 'middle')
-                .text(edge.operator)
-        }
-
-        if (edge.operator == "="){
-            path.attr("marker-end", "url(#arrowhead)")
-        }
-    }
-
-    for (let group of graph.groups.filter(gr => gr.grouptype == "table")){
-        let topnode = group.nodes.sort((a, b) => getNodeCoordY(a) > getNodeCoordY(b))[0]
-
-        let g = svg.append('g')
-            .attr('transform', 'translate(' + (getNodeCoordX(topnode)) + ',' + (getNodeCoordY(topnode) - nodeYDistance) +')')
-        
-        g.append("rect")
-            .attr('height', nodeYDistance)
-            .attr("width", attrWidth)
-            .attr('x', -attrWidth/2)
-            .attr('y', -nodeYDistance/2)
-            .attr('stroke-width', 1)
-            .attr("stroke", "black")
-            .attr("fill", "black")
-
-        g.append('text')
-            .text(group.name + (group.tablealias != group.name && group.tablealias != undefined? " " + group.tablealias : ""))
-            .attr('text-anchor', 'middle')
-            .style("font-family", "Arial")
-            .attr('y', 3)
-            .attr('fill', "white")
-            .style('font-size', '0.7em')
-            .style("font-weight", "bold")
-    }
-
-    for (let group of graph.groups.filter(gr => gr.grouptype == "negated_subquery" || gr.negateSingleTable == true)){
-        let topnode = group.nodes.sort((a, b) => getNodeCoordY(a) > getNodeCoordY(b))[0]
-        let bottomnode = group.nodes.sort((a, b) => getNodeCoordY(a) < getNodeCoordY(b))[0]
-        let leftmostnode = group.nodes.sort((a, b) => getNodeCoordX(a) > getNodeCoordX(b))[0]
-        let rightmostnode = group.nodes.sort((a, b) => getNodeCoordX(a) < getNodeCoordX(b))[0]
-
-        let groupmargin = 7
-
-        let g = svg.append('g')
-            .attr('transform', 'translate(' + (getNodeCoordX(leftmostnode)) + ',' + (getNodeCoordY(topnode) - nodeYDistance) +')')
-        
-        g.append("rect")
-            .attr('height', getNodeCoordY(bottomnode) - getNodeCoordY(topnode) + nodeYDistance*2 + groupmargin*2)
-            .attr("width", getNodeCoordX(rightmostnode) - getNodeCoordX(leftmostnode) + attrWidth + groupmargin*2)
-            .attr('x', -attrWidth/2 - groupmargin)
-            .attr('y', -nodeYDistance/2 - groupmargin)
-            .attr("rx", 5)
-            .attr("ry", 5)
-            .attr('stroke-width', 2)
-            .attr("stroke", "black")
-            .attr("fill", "none")
-            .attr("stroke-dasharray", "5 5")
-    }
-
-    for (let group of graph.groups.filter(gr => gr.grouptype == "all_subquery" || gr.allSingleTable == true)){
-        let topnode = group.nodes.sort((a, b) => getNodeCoordY(a) > getNodeCoordY(b))[0]
-        let bottomnode = group.nodes.sort((a, b) => getNodeCoordY(a) < getNodeCoordY(b))[0]
-        let leftmostnode = group.nodes.sort((a, b) => getNodeCoordX(a) > getNodeCoordX(b))[0]
-        let rightmostnode = group.nodes.sort((a, b) => getNodeCoordX(a) < getNodeCoordX(b))[0]
-
-        let groupmargin = 7
-
-        let g = svg.append('g')
-            .attr('transform', 'translate(' + (getNodeCoordX(leftmostnode)) + ',' + (getNodeCoordY(topnode) - nodeYDistance) +')')
-        
-        g.append("rect")
-            .attr('height', getNodeCoordY(bottomnode) - getNodeCoordY(topnode) + nodeYDistance*2 + groupmargin*2)
-            .attr("width", getNodeCoordX(rightmostnode) - getNodeCoordX(leftmostnode) + attrWidth + groupmargin*2)
-            .attr('x', -attrWidth/2 - groupmargin)
-            .attr('y', -nodeYDistance/2 - groupmargin)
-            .attr("rx", 5)
-            .attr("ry", 5)
-            .attr('stroke-width', 2)
-            .attr("stroke", "black")
-            .attr("fill", "none")
-
-        g.append("rect")
-            .attr('height', getNodeCoordY(bottomnode) - getNodeCoordY(topnode) + nodeYDistance*2 + (groupmargin + 3)*2)
-            .attr("width", getNodeCoordX(rightmostnode) - getNodeCoordX(leftmostnode) + attrWidth + (groupmargin + 3)*2)
-            .attr('x', -attrWidth/2 - groupmargin - 3)
-            .attr('y', -nodeYDistance/2 - groupmargin - 3)
-            .attr("rx", 5)
-            .attr("ry", 5)
-            .attr('stroke-width', 2)
-            .attr("stroke", "black")
-            .attr("fill", "none")
-    }
-
-    for (let depth in graph.nodeIndex){
-        for (let node of graph.nodeIndex[depth]){
-
-            let g = svg.append('g')
-                .attr('transform', 'translate(' + (getNodeCoordX(node)) + ',' + getNodeCoordY(node) +')')
-                .attr('opacity', () => {return node.type == "fake"? 0.3 : 1})
-
-            g.append('rect')
-                .datum(node)
-                .attr('class', 'node')
-                .attr('height', nodeYDistance)
-                .attr("width", attrWidth)
-                .attr('x', -attrWidth/2)
-                .attr('y', -nodeYDistance/2)
-                .attr('stroke-width', 1)
-                .attr("stroke", "black")
-                .attr('fill', node.nodetype == "constraint"? "#FFFF99" : "none")
-
-            g.append('text')
-                .text(node.name)
-                .attr('text-anchor', 'middle')
-                .style("font-family", "Arial")
-                .attr('y', 3)
-                .attr('fill', node.drawtype == "th"? "white" : "black")
-                .style('font-size', '0.63em')
-                .style("font-weight", "bold")
-        }
-    }
-
-    svg.attr("height", Math.max.apply(0, graph.nodes.map(n => getNodeCoordY(n) + 20)))
-    svg.attr("viewBox", "0 0 " + Math.max.apply(0, graph.nodes.map(n => getNodeCoordX(n) + 80)) + " " + Math.max.apply(0, graph.nodes.map(n => getNodeCoordY(n) + 50)))
-}
 
 let manageSelect = (g, ast, selectTable) => {
     // if it's select *
@@ -404,34 +212,41 @@ let manageFrom = (g, ast, selectTable) => {
     }
 }
 
-let getAttrInTable = (g, node) => {
-    let tableidentifier = node.value.split(".")[0]
-    let attrname = node.value.split(".")[1]
+// let getAttrInTable = (g, node) => {
+//     let tableidentifier, attrname;
 
-    let t = g.groups.find(gr => gr.tablealias == tableidentifier)
-    let attr = t.nodes.find(n => n.name == attrname)
-    if (attr == undefined){
-        attr = {name: attrname, depth: 0, table: t}
-        t.nodes.push(attr)
-        g.addNode(attr)
-    }
+//     if (node.value.includes(".")){
+//         tableidentifier = node.value.split(".")[0]
+//         attrname = node.value.split(".")[1]
+//     } else {
+//         tableidentifier = getTableFromAttrIdentifier(g, node).tablealias;
+//         attrname = node.value;
+//     }
 
-    return attr
-}
+//     let t = g.groups.find(gr => gr.tablealias == tableidentifier)
+//     let attr = t.nodes.find(n => n.name == attrname)
+//     if (attr == undefined){
+//         attr = {name: attrname, depth: 0, table: t}
+//         t.nodes.push(attr)
+//         g.addNode(attr)
+//     }
 
-let getTableFromAttrIdentifier = (g, node) => {
-    let table, talias;
-    if (node.value.includes(".")){
-        talias = node.value.split(".")[0]
-        table = g.groups.find(gr => gr.grouptype == "table" && gr.tablealias == talias)
-    } else {
-        let schemaEntry = schema.split('\n').find(l => 
-            l.split("(")[1].replace(")", "").split(",").find(el => el.trim() == node.value + "")
-        ).split('(')[0]
-        table = g.groups.find(gr => gr.grouptype == "table" && (gr.name == schemaEntry))
-    }
-    return table;
-}
+//     return attr
+// }
+
+// let getTableFromAttrIdentifier = (g, node) => {
+//     let table, talias;
+//     if (node.value.includes(".")){
+//         talias = node.value.split(".")[0]
+//         table = g.groups.find(gr => gr.grouptype == "table" && gr.tablealias == talias)
+//     } else {
+//         let schemaEntry = schema.split('\n').find(l => 
+//             l.split("(")[1].replace(")", "").split(",").find(el => el.trim() == node.value + "")
+//         ).split('(')[0]
+//         table = g.groups.find(gr => gr.grouptype == "table" && (gr.name == schemaEntry))
+//     }
+//     return table;
+// }
 
 let manageSubQuery = (g, astNode, subquerytype, prevnode) => {
     console.log("AST NODE", astNode)
@@ -443,7 +258,10 @@ let manageSubQuery = (g, astNode, subquerytype, prevnode) => {
     for (let el of astNode.from.value){
         let ref = el.value
         let refName = ref.value.value
-        let refAlias = ref.alias.value
+        let refAlias;
+        
+        if (ref.alias != undefined) refAlias = ref.alias.value;
+        else refAlias = refName;
 
         if (g.groups.find(gr => gr.grouptype == "table" && gr.tablealias == refAlias)) continue;
         else {
@@ -472,20 +290,8 @@ let manageSubQuery = (g, astNode, subquerytype, prevnode) => {
 }
 
 let manageWhere = (g, astNode) => {
-    
-    let getAttrInTable2 = (table, attrname) => {
-        let res = table.nodes.find(n => n.name == attrname);
-        if (res != undefined) return res;
-        else {
-            newNode = {name: attrname, depth: 0, table: table}
-            table.nodes.push(newNode);
-            g.addNode(newNode);
-            return newNode;
-        }
-    }
 
     let exploreNode = (node) => {
-        // console.log(exploring )
 
         if (node.type == "AndExpression"){
             let newnodes1 = exploreNode(node.left);
@@ -503,42 +309,19 @@ let manageWhere = (g, astNode) => {
 
             if (node.left.type == "Identifier" && node.right.type == "Identifier"){
 
-                let leftTableName = leftElem.split(".")[0]
-                let rightTableName = rightElem.split(".")[0]
-                let leftAttrName = leftElem.split(".")[1]
-                let rightAttrName = rightElem.split(".")[1]
-
-                let leftTable = g.groups.find(gr => gr.grouptype == "table" && (gr.name == leftTableName || gr.tablealias == leftTableName))
-                let rightTable = g.groups.find(gr => gr.grouptype == "table" && (gr.name == rightTableName || gr.tablealias == rightTableName))
-
-                if (leftTable == undefined) {
-                    let schemaEntry = schema.split('\n').find(l => l.split("(")[1].replace(")", "").split(",").find(el => el.trim() == leftTableName)).split('(')[0]
-                    leftTable = g.groups.find(gr => gr.grouptype == "table" && (gr.name == schemaEntry))
-                    leftAttrName = leftTableName;
-                } 
-                if (rightTable == undefined) {
-                    let schemaEntry = schema.split('\n').find(l => l.split("(")[1].replace(")", "").split(",").find(el => el.trim() == rightTableName)).split('(')[0]
-                    rightTable = g.groups.find(gr => gr.grouptype == "table" && (gr.name == schemaEntry))
-                    rightAttrName = rightTableName;
-                }
-
-                let leftTableAttr = getAttrInTable2(leftTable, leftAttrName);
-                let rightTableAttr = getAttrInTable2(rightTable, rightAttrName);
+                let leftTableAttr = getAttrInTable(g, node.left)
+                let rightTableAttr = getAttrInTable(g, node.right)
 
                 g.addEdge({nodes: [leftTableAttr, rightTableAttr], operator: node.operator})
 
                 return [leftTableAttr, rightTableAttr]
             } else if (node.left.type == "Identifier" && node.right.type != "Identifier") {
 
-                // let leftTableName = leftElem.split(".")[0]
-                // let leftAttrName = leftElem.split(".")[1]
-
                 let attrName;
                 let leftTable = getTableFromAttrIdentifier(g, node.left)
                 if (node.left.value.includes(".")) attrName = node.left.value.split(".")[1]
                 else attrName = node.left.value
 
-                // let leftTable = g.groups.find(gr => gr.grouptype == "table" && (gr.name == leftTableName || gr.tablealias == leftTableName))
                 newNode = {name: attrName + " " + node.operator + " " + node.right.value, depth: 0, table: leftTable, nodetype: "constraint"}
                 g.addNode(newNode)
                 leftTable.nodes.push(newNode)
@@ -573,63 +356,64 @@ for (let i in QUERY){
     else schema = SCHEMA["Abstract"]
     if (query == undefined || query.length == 0) continue;
 
-    let ast = sqlParser.parse(query);
-    console.log(ast)
-
     let row = container.append("div").attr("class", "row row-divided np-element").style("align-items", "center")
-
     row.append("div").text(count)
-
     row.append("div").attr("class", "col-sm").append("pre").text(query)
 
-    let g = new SimpleGraph();
+    let qp = new QueryParser(query, schema);
+    let g = qp.g;
 
-    let selectTable = {nodes: [], name: "SELECT", grouptype: "table"}
-    g.addGroup(selectTable)
+    // let ast = sqlParser.parse(query);
+    // console.log(ast)
 
-    // MANAGE SELECT
-    manageSelect(g, ast, selectTable);
+    // g = new SimpleGraph();
+
+    // let selectTable = {nodes: [], name: "SELECT", grouptype: "table"}
+    // g.addGroup(selectTable)
+
+    // // MANAGE SELECT
+    // manageSelect(g, ast, selectTable);
   
-    // MANAGE FROM
-    try {
-        manageFrom(g, ast, selectTable);
-    } catch (error) {
-        console.log(error, query, g)
-    }
+    // // MANAGE FROM
+    // try {
+    //     manageFrom(g, ast, selectTable);
+    // } catch (error) {
+    //     console.log(error, query, g)
+    // }
     
-    // MANAGE WHERE
+    // // MANAGE WHERE
 
-    try {
-        if (ast.value.where != null)
-            manageWhere(g, ast.value.where, schema)
-    } catch (error) {console.log(error, query, g)}
+    // try {
+    //     if (ast.value.where != null)
+    //         manageWhere(g, ast.value.where, schema)
+    // } catch (error) {console.log(error, query, g)}
 
-    // DEFINE SUBQUERIES    
+    // // DEFINE SUBQUERIES    
 
-    for (let q=0; q<=subquerycount; q++){
-        let subqgroup = g.groups.filter(gr => gr.grouptype == "table" && gr.subqueryid == q)
-        if (subqgroup.length == 0) continue;
-        else if (subqgroup.length == 1){
-            if (subquerymap[q] == "negate") subqgroup[0].negateSingleTable = true;
-            else if (subquerymap[q] == "ALL") subqgroup[0].allSingleTable = true;
-        } else {
-            let newGroup;
-            if (subquerymap[q] == "negate") newGroup = {nodes: [], grouptype: "negated_subquery"};
-            else if (subquerymap[q] == "negate") newGroup = {nodes: [], grouptype: "all_subquery"};
-            else newGroup = {nodes: [], grouptype: "subquery"};
-            newGroup.nodes = subqgroup.map(d => d.nodes).flat()
-            g.addGroup(newGroup);
-        }
-    }
+    // for (let q=0; q<=subquerycount; q++){
+    //     let subqgroup = g.groups.filter(gr => gr.grouptype == "table" && gr.subqueryid == q)
+    //     if (subqgroup.length == 0) continue;
+    //     else if (subqgroup.length == 1){
+    //         if (subquerymap[q] == "negate") subqgroup[0].negateSingleTable = true;
+    //         else if (subquerymap[q] == "ALL") subqgroup[0].allSingleTable = true;
+    //     } else {
+    //         let newGroup;
+    //         if (subquerymap[q] == "negate") newGroup = {nodes: [], grouptype: "negated_subquery"};
+    //         else if (subquerymap[q] == "negate") newGroup = {nodes: [], grouptype: "all_subquery"};
+    //         else newGroup = {nodes: [], grouptype: "subquery"};
+    //         newGroup.nodes = subqgroup.map(d => d.nodes).flat()
+    //         g.addGroup(newGroup);
+    //     }
+    // }
 
-    for (let group of g.groups.filter(gr => gr.grouptype == "table")){
-        group.restricted_vertically = true;
-        group.restricted_height = group.nodes.length;
-    }
+    // for (let group of g.groups.filter(gr => gr.grouptype == "table")){
+    //     group.restricted_vertically = true;
+    //     group.restricted_height = group.nodes.length;
+    // }
 
-    // ASSIGN RANKS
+    // // ASSIGN RANKS
 
-    assignRanks(g, selectTable);
+    // assignRanks(g, selectTable);
 
     // g.addAnchors();
 
@@ -639,10 +423,10 @@ for (let i in QUERY){
         runSimpleLpWorker(g, row, i)
     } catch (error) {console.log("ERROR IN QUERY " + count + "\n", error)}
 
-    let wrong = [8, 32, 34, 35, 36, 40, 41, 42]
+    let wrong = []
     if (wrong.includes(count)) row.style("background-color", "#FCC")
 
-    if (count == 42) break;
+    if (count == 46) break;
     count++;
 }
 
@@ -667,6 +451,9 @@ async function runSimpleLpWorker(g, row, qindex) {
         myWorker.addEventListener('message', (msg) => {
             finished = true;
             algorithm = msg.data.algorithm;
+
+            // console.log(algorithm.modelString)
+            // console.log(algorithm.result)
 
             let g = msg.data.graph
 

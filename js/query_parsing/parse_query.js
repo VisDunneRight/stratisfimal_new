@@ -4,7 +4,7 @@ class QueryParser {
         this.schema = schema;
 
         let ast = sqlParser.parse(query);
-        console.log(ast);
+        // console.log(ast);
 
         this.g = new SimpleGraph();
         this.subquerycount = 0;
@@ -38,11 +38,11 @@ class QueryParser {
             group.restricted_height = group.nodes.length;
         }
 
-        console.log(this.g)
+        // console.log(this.g)
     }
 
     exploreNode(node, prevtable) {
-        console.log("exploring ", node)
+        // console.log("exploring ", node)
 
         if (node.type == "Select"){
             for (let el of node.from.value){
@@ -243,7 +243,6 @@ class QueryParser {
             talias = node.value.split(".")[0]
             table = this.g.groups.find(gr => gr.grouptype == "table" && gr.tablealias == talias)
         } else {
-            console.log(node, this.schema, this.query)
             let schemaEntry = this.schema.split('\n').filter(l => 
                 l.split("(")[1].replace(")", "").split(",").find(el => el.trim() == node.value + "")
             ).map(l => l.split("(")[0])
@@ -303,41 +302,74 @@ class QueryParser {
             }
         }
     }
+
+    addAnchors(){
+        if (this.g.groups.filter(gr => gr.grouptype != "table").length == 0) return;
+        // console.log(this.g.groups.map(gr => new Set(gr.nodes.map(n => n.depth)).size), this.g.groups.some(gr => new Set(gr.nodes.map(n => n.depth)).size != 1))
+        if (!this.g.groups.some(gr => new Set(gr.nodes.map(n => n.depth)).size != 1)) return;
+
+        for (let e of this.g.edges){
+            if (Math.abs(e.nodes[0].depth - e.nodes[1].depth) > 1) {
+                let minDepth = Math.min(e.nodes[0].depth, e.nodes[1].depth)
+                let maxDepth = Math.max(e.nodes[0].depth, e.nodes[1].depth)
+                let newanchors = [];
+
+                for (let i = minDepth + 1; i<maxDepth; i++){
+                    let n = {depth: i, name: 'a' + this.g.fakeNodeCount++, type: 'fake'};
+                    this.g.addNode(n);
+                    newanchors.push(n);
+                }
+
+                let firstEdge = {nodes:[e.nodes[0], newanchors[0]]};
+                let lastEdge = {nodes:[newanchors[newanchors.length - 1], e.nodes[1]]};  
+
+                if (e.value != undefined){
+                    firstEdge.value = e.value;
+                    lastEdge.value = e.value;
+                }
+
+                this.g.addEdge(firstEdge);
+                this.g.addEdge(lastEdge);
+
+                for (let i = 1; i < newanchors.length; i++){
+                    let newEdge = {nodes: [newanchors[i-1], newanchors[i]]}; 
+                    if (e.value != undefined) newEdge.value = e.value;
+                    
+                    this.g.addEdge(newEdge);
+                }
+            }
+        }
+
+        this.g.edges = this.g.edges.filter(e => Math.abs(e.nodes[0].depth - e.nodes[1].depth) <= 1);
+
+        // note: this is important
+        this.g.groups = this.g.groups.sort((a, b) => a.nodes.length > b.nodes.length? 1 : -1)
+
+        for (let g of this.g.groups){
+            let minRank = Math.min.apply(0, g.nodes.map(n => n.depth))
+            let maxRank = Math.max.apply(0, g.nodes.map(n => n.depth))
+            let maxNodesInRank = 0;
+            for (let r = minRank; r <= maxRank; r++){
+                if (g.nodes.filter(n => n.depth == r).length > maxNodesInRank) maxNodesInRank = g.nodes.filter(n => n.depth == r).length;
+            }
+            for (let r = minRank; r <= maxRank; r++){
+                while (g.nodes.filter(n => n.depth == r).length < maxNodesInRank){
+                    let n = {depth: r, name: 'a' + this.fakeNodeCount++, type: 'fake'};
+                    for (let gr of this.g.groups){
+                        if (g.nodes.every(val => gr.nodes.includes(val)) && gr != g) gr.nodes.push(n);
+                    }
+                    g.nodes.push(n);
+                    this.g.addNode(n);
+                }
+            }
+        }
+
+        let maxNodesInRank = Math.max.apply(0, this.g.nodeIndex.map(n => n.length))
+        for (let r in this.g.nodeIndex){
+            if (this.g.groups.length == 0) continue;
+            while (this.g.nodeIndex[r].length < maxNodesInRank){
+                this.g.addNode({depth: r, name: 'a' + this.g.fakeNodeCount++, type: 'fake'});
+            }
+        }
+    }
 }
-
-// let getTableFromAttrIdentifier = (g, node) => {
-//     let table, talias;
-//     if (node.value.includes(".")){
-//         talias = node.value.split(".")[0]
-//         table = g.groups.find(gr => gr.grouptype == "table" && gr.tablealias == talias)
-//     } else {
-//         let schemaEntry = schema.split('\n').find(l => 
-//             l.split("(")[1].replace(")", "").split(",").find(el => el.trim() == node.value + "")
-//         ).split('(')[0]
-//         table = g.groups.find(gr => gr.grouptype == "table" && (gr.name == schemaEntry))
-//     }
-//     return table;
-// }
-
-// let getAttrInTable = (g, node) => {
-//     let tableidentifier, attrname;
-
-//     if (node.value.includes(".")){
-//         tableidentifier = node.value.split(".")[0]
-//         attrname = node.value.split(".")[1]
-//     } else {
-//         console.log(getTableFromAttrIdentifier(g, node))
-//         tableidentifier = getTableFromAttrIdentifier(g, node).tablealias;
-//         attrname = node.value;
-//     }
-
-//     let t = g.groups.find(gr => gr.tablealias == tableidentifier)
-//     let attr = t.nodes.find(n => n.name == attrname)
-//     if (attr == undefined){
-//         attr = {name: attrname, depth: 0, table: t}
-//         t.nodes.push(attr)
-//         g.addNode(attr)
-//     }
-
-//     return attr
-// }

@@ -336,6 +336,33 @@ class SimpleGraph {
 
         return root;
     }
+
+    cleanup(){
+        // remove all empty entries in this.nodeIndex
+        let allNextIndicesEmpty = (i) => {
+            for (let j = i; j<this.nodeIndex.length; j++){
+                if (this.nodeIndex[j].length != 0) return false;
+            }
+            return true;
+        }
+
+        for (let i in this.nodeIndex){
+            if (allNextIndicesEmpty(i)){
+                this.nodeIndex.splice(i);
+                break;
+            }
+        }
+
+        // remove all empty groups
+        let groupsToRemove = [];
+        for (let gr of this.groups){
+            if (gr.nodes.length == 0) groupsToRemove.push(gr)
+        }
+
+        for (let gr of groupsToRemove){
+            this.groups.splice(this.groups.indexOf(gr), 1)
+        }
+    }
 }
 
 try {

@@ -393,8 +393,6 @@ class SimpleLp {
             for (let group of this.g.groups){
                 // for each group, ytop should be above ybottom
                 this.model.subjectTo += "ytop_" + group.id + " - ybottom_" + group.id + " < " + (-1) + "\n";
-                console.log(group.name, group.restricted_vertically, group.restricted_height)
-                // if (group.restricted_vertically) this.model.subjectTo += "ybottom_" + group.id + " - ytop_" + group.id + " = " + group.restricted_height + "\n"
 
                 // every node in the group should be within the boundaries of the group, below ytop and above ybottom
                 for (let node of group.nodes){

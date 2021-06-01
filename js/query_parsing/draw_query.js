@@ -97,6 +97,30 @@ let drawQuery = (svg, graph, nodeXDistance = 50, nodeYDistance = 50) => {
             .style("font-weight", "bold")
     }
 
+    for (let group of graph.groups.filter(gr => gr.grouptype == "subquery")){
+        let topnode = group.nodes.sort((a, b) => getNodeCoordY(a) > getNodeCoordY(b))[0]
+        let bottomnode = group.nodes.sort((a, b) => getNodeCoordY(a) < getNodeCoordY(b))[0]
+        let leftmostnode = group.nodes.sort((a, b) => getNodeCoordX(a) > getNodeCoordX(b))[0]
+        let rightmostnode = group.nodes.sort((a, b) => getNodeCoordX(a) < getNodeCoordX(b))[0]
+
+        let groupmargin = 7
+
+        let g = svg.append('g')
+            .attr('transform', 'translate(' + (getNodeCoordX(leftmostnode)) + ',' + (getNodeCoordY(topnode) - nodeYDistance) +')')
+        
+        g.append("rect")
+            .attr('height', getNodeCoordY(bottomnode) - getNodeCoordY(topnode) + nodeYDistance*2 + groupmargin*2)
+            .attr("width", getNodeCoordX(rightmostnode) - getNodeCoordX(leftmostnode) + attrWidth + groupmargin*2)
+            .attr('x', -attrWidth/2 - groupmargin)
+            .attr('y', -nodeYDistance/2 - groupmargin)
+            .attr("rx", 5)
+            .attr("ry", 5)
+            .attr('stroke-width', 5)
+            .attr("stroke", "gray")
+            .attr("stroke-opacity", 0.3)
+            .attr("fill", "none")
+    }
+
     for (let group of graph.groups.filter(gr => gr.grouptype == "negated_subquery" || gr.negateSingleTable == true)){
         let topnode = group.nodes.sort((a, b) => getNodeCoordY(a) > getNodeCoordY(b))[0]
         let bottomnode = group.nodes.sort((a, b) => getNodeCoordY(a) < getNodeCoordY(b))[0]
@@ -161,6 +185,7 @@ let drawQuery = (svg, graph, nodeXDistance = 50, nodeYDistance = 50) => {
             let g = svg.append('g')
                 .attr('transform', 'translate(' + (getNodeCoordX(node)) + ',' + getNodeCoordY(node) +')')
                 .attr('opacity', () => {return node.type == "fake"? 0.3 : 1})
+                
 
             g.append('rect')
                 .datum(node)
@@ -172,6 +197,8 @@ let drawQuery = (svg, graph, nodeXDistance = 50, nodeYDistance = 50) => {
                 .attr('stroke-width', 1)
                 .attr("stroke", "black")
                 .attr('fill', node.nodetype == "constraint"? "#FFFF99" : "none")
+                
+                
 
             g.append('text')
                 .text(node.id)
@@ -181,6 +208,15 @@ let drawQuery = (svg, graph, nodeXDistance = 50, nodeYDistance = 50) => {
                 .attr('fill', node.drawtype == "th"? "white" : "black")
                 .style('font-size', '0.63em')
                 .style("font-weight", "bold")
+                .on('mouseover', function(){
+                    d3.select(this).style('fill', 'red')
+                    d3.select('#sql-div-' + node.astNodeIndex).style('background-color', 'yellow')
+                })
+                .on('mouseout', function(){
+                    d3.select(this).style("fill", node.drawtype == "th"? "white" : "black")
+                    d3.select('#sql-div-' + node.astNodeIndex).style('background-color', '#ffffff00')
+                })
+                
         }
     }
 

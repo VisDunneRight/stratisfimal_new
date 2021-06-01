@@ -124,6 +124,7 @@ class SimpleLp {
             this.addBendinessReductionToMinimize();
         }
 
+        // adds variables for groups in definitions
         if (this.options.simplify_for_groups_enabled){
             for (let group of this.g.groups){
                 let nodesOutSideGroup = this.g.nodes.filter(n => group.nodes.map(node => node.depth).includes(n.depth) && !group.nodes.includes(n));
@@ -437,8 +438,13 @@ class SimpleLp {
                 // either above ytop or below ybottom
                 if (!this.options.simplify_for_groups_enabled){
                     for (let node of this.g.nodes.filter(n => !group.nodes.includes(n) && group.nodes.map(n => n.depth).includes(n.depth))){
-                        this.model.subjectTo += "y_" + node.id + " - " + this.m + " zint_" + this.zintcount + " - ytop_" + group.id + " < " + (-1 - this.options.group_distance) + "\n";
-                        this.model.subjectTo += "- y_" + node.id + " + " + this.m + " zint_" + this.zintcount + " + ybottom_" + group.id + " <= " + this.m + "\n";
+                        // this.model.subjectTo += "y_" + node.id + " - " + this.m + " zint_" + this.zintcount + " - ytop_" + group.id + " < " + (-1 - this.options.group_distance) + "\n";
+                        // this.model.subjectTo += "- y_" + node.id + " + " + this.m + " zint_" + this.zintcount + " + ybottom_" + group.id + " <= " + this.m + "\n";
+                        let p1 = this.mkxDict(" - ", group.nodes.filter(n => n.depth == node.depth)[0].id, node.id, this.m)
+                        let p2 = this.mkxDict(" + ", group.nodes.filter(n => n.depth == node.depth)[0].id, node.id, this.m)
+
+                        this.model.subjectTo += "y_" + node.id + p1[0] + " - ytop_" + group.id + " < " + (-1 - this.options.group_distance - p1[1]) + "\n";
+                        this.model.subjectTo += "- y_" + node.id + p2[0] + " + ybottom_" + group.id + " <= " + (this.m + p2[1]) + "\n";
 
                         this.zintcount += 1;
                     }
@@ -593,12 +599,17 @@ class SimpleLp {
                         let tmp = ""
                         let finalsum = 0;
 
-                        for (let n1 of nodesInGroupInR1){
-                            for (let n2 of nodesNotInGroupInR1){
-                                tmp += this.mkxDict(" + ", n1.id, n2.id)[0]
-                                finalsum += this.mkxDict(" + ", n1.id, n2.id)[1]
-                            }
-                        } 
+                        // for (let n1 of nodesInGroupInR1){
+                        //     for (let n2 of nodesNotInGroupInR1){
+                        //         tmp += this.mkxDict(" + ", n1.id, n2.id)[0]
+                        //         finalsum += this.mkxDict(" + ", n1.id, n2.id)[1]
+                        //     }
+                        // } 
+
+                        for (let n2 of nodesNotInGroupInR1){
+                            tmp += this.mkxDict(" + ", nodesInGroupInR1[0].id, n2.id)[0]
+                            finalsum += this.mkxDict(" + ", nodesInGroupInR1[0].id, n2.id)[1]
+                        }
 
                         // console.log(nodesNotInGroupInR1, nodesNotInGroupInR2)
 

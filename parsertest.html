@@ -29,6 +29,7 @@
 
     <script src="./js/query_parsing/draw_query.js"></script>
     <script src="./js/query_parsing/parse_query.js"></script>
+    <script src="./js/query_parsing/ast_to_dom_elements.js"></script>
     
     <script src="./js/query_samples/queries.js"></script>
     <style>
@@ -66,12 +67,16 @@
 
 <script>
 
+function stripformatting(elem, e) {
+    elem.innerHTML = elem.innerText;
+}
+
 let container = d3.select("body").append("div").attr("class", "container-fluid")
 
 let row = container.append("div").attr("class", "row row-divided np-element").style("align-items", "center")
 let c = row.append("div").attr("class", "col").style("text-align", "center")
-c.append("pre").attr("class", "editable-pre").attr("id", "userschema").attr("contenteditable", true).text(SCHEMA["Bars"])
-c.append("pre").attr("class", "editable-pre").attr("id", "userquery").attr("contenteditable", true).text(QUERY[101])
+c.append("pre").attr("class", "editable-pre").attr("id", "userschema").attr("contenteditable", true).on("keyup", function() {stripformatting(this)}).text(SCHEMA["Bars"])
+c.append("pre").attr("class", "editable-pre").attr("id", "userquery").attr("contenteditable", true).on("keyup", function() {stripformatting(this)}).text(QUERY[101])
 c.append("button").attr("class", "btn-secondary").text("submit").on("click", () => {
     let schema = d3.select("#userschema").text()
     let query = d3.select("#userquery").text()
@@ -103,7 +108,8 @@ for (let i in QUERY){
     else if (i < 301) schema = SCHEMA["IMDB"]
     else if (i < 401) schema = SCHEMA["Sailors"]
     else if (i < 501) schema = SCHEMA["Belief worlds"]
-    else schema = SCHEMA["Abstract"]
+    else if (i < 600) schema = SCHEMA["Abstract"]
+    else schema = SCHEMA["TPC-H"]
     if (query == undefined || query.length == 0) continue;
 
     let row = container.append("div").attr("class", "row row-divided np-element").style("align-items", "center")
@@ -126,7 +132,7 @@ for (let i in QUERY){
     let wrong = []
     if (wrong.includes(count)) row.style("background-color", "#FCC")
 
-    if (count == 46) break;
+    if (count == 40) break;
     count++;
 }
 
@@ -152,17 +158,22 @@ async function runSimpleLpWorker(g, row, qindex) {
             finished = true;
             algorithm = msg.data.algorithm;
 
-            // console.log(algorithm.modelString)
-            // console.log(algorithm.result)
-
             let g = msg.data.graph
 
             let svg = row.append("div").attr("class", "col-md vis-container").append("svg").attr("width", "100%")
             try { drawQuery(svg, g, 200, 20) } catch (error) {console.log(error)}
 
-            if (qindex != undefined) row.append("div").attr("class", "col-sm").style("text-align", "center")
-                .append("img").attr("src", "./qv_pics/" + qindex + ".png")
+            if (qindex != undefined) {
+                let newdiv = row.append("div").attr("class", "col-sm").style("text-align", "center")
+                
+                newdiv.append("img").attr("src", "./qv_pics/" + qindex + ".png")
                 .style("max-width", "70%").style("padding", "3%")
+
+                newdiv.append("div")
+                .text("time: " + algorithm.solveTime + " ms")
+            }
+                
+
         });
 
         setTimeout(() => {

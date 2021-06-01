@@ -4,11 +4,13 @@ class QueryParser {
         this.schema = schema;
 
         let ast = sqlParser.parse(query);
-        // console.log(ast);
+        console.log(ast);
+        // new AstToDomElements(ast);
 
         this.g = new SimpleGraph();
         this.subquerycount = 0;
         this.subquerymap = {};
+        this.astNodeCount = 0;
 
         let selectTable = {nodes: [], name: "SELECT", grouptype: "table", tablealias: "SELECT"}
         this.g.addGroup(selectTable);
@@ -38,11 +40,13 @@ class QueryParser {
             group.restricted_height = group.nodes.length;
         }
 
-        // console.log(this.g)
+        console.log(this.g)
     }
 
     exploreNode(node, prevtable) {
         // console.log("exploring ", node)
+        this.astNodeCount++;
+        node.astId = this.astNodeCount;
 
         if (node.type == "Select"){
             for (let el of node.from.value){
@@ -62,18 +66,18 @@ class QueryParser {
                         let tname = this.g.groups.find(gr => gr.tablealias == el.value.split(".")[0]).name;
                         let attrlist = this.getAttrsFromSchema(tname);
                         for (let attr of attrlist){
-                            let n1 = {name: attr, depth: 0, table: prevtable, subqueryid: this.subquerycount}
+                            let n1 = {name: attr, depth: 0, table: prevtable, subqueryid: this.subquerycount, astNodeIndex: el.astNodeIndex}
                             prevtable.nodes.push(n1);
                             this.g.addNode(n1);
                             let t2 = this.g.groups.find(gr => gr.tablealias == el.value.split(".")[0])
-                            let n2 = {name: attr, depth: 0, table: t2, subqueryid: this.subquerycount};
+                            let n2 = {name: attr, depth: 0, table: t2, subqueryid: this.subquerycount, astNodeIndex: el.astNodeIndex};
                             this.g.addNode(n2);
                             t2.nodes.push(n2);
                             this.g.addEdge({nodes: [n1, n2]})
                         }
                     } else {
                         let attr1 = this.getAttrInTable(el)
-                        let attr2 = {name: attr1.name, depth: 0, table: prevtable, subqueryid: this.subquerycount}
+                        let attr2 = {name: attr1.name, depth: 0, table: prevtable, subqueryid: this.subquerycount, astNodeIndex: el.astNodeIndex}
                         prevtable.nodes.push(attr2);
                         this.g.addNode(attr2);
                         this.g.addEdge({nodes: [attr1, attr2]});
@@ -85,13 +89,13 @@ class QueryParser {
                     let tname = el.value.value.value;
                     let attrlist = this.getAttrsFromSchema(tname);
                     for (let attr of attrlist){
-                        let n1 = {name: attr, depth: 0, table: prevtable, subqueryid: this.subquerycount}
+                        let n1 = {name: attr, depth: 0, table: prevtable, subqueryid: this.subquerycount, astNodeIndex: el.astNodeIndex}
                         prevtable.nodes.push(n1)
                         this.g.addNode(n1);
                         let g2 = this.g.groups.find(gr => gr.tablealias == tname)
                         let n2 = g2.nodes.find(n => n.name == attr)
                         if (n2 == undefined){
-                            n2 = {name: attr, table: g2, depth: 0, subqueryid: this.subquerycount}
+                            n2 = {name: attr, table: g2, depth: 0, subqueryid: this.subquerycount, astNodeIndex: el.astNodeIndex}
                             this.g.addNode(n2)
                             g2.nodes.push(n2)
                         }
@@ -116,34 +120,6 @@ class QueryParser {
             this.subquerycount += 1;
             return this.exploreNode(node.value)
         } else if (node.type == "ComparisonSubQueryBooleanPrimary") {
-            // this.subquerycount += 1;
-            // this.subquerymap[this.subquerycount] = "ALL";
-
-            // for (let el of node.right.from.value){
-            //     let ref = el.value
-            //     let refName = ref.value.value
-            //     let refAlias;
-                
-            //     if (ref.alias != undefined) refAlias = ref.alias.value;
-            //     else refAlias = refName;
-        
-            //     if (this.g.groups.find(gr => gr.grouptype == "table" && gr.tablealias == refAlias)) continue;
-            //     else {
-            //         let newTable = {nodes: [], name: refName, tablealias: refAlias, grouptype: "table", subqueryid: this.subquerycount}
-            //         this.g.addGroup(newTable)
-            //     }
-            // }
-
-            // for (let el of node.right.selectItems.value){
-            //     if (el.value.includes("*")) continue;
-            //     let attr1 = this.getAttrInTable(el)
-            //     let attr2 = this.getAttrInTable(node.left)
-    
-            //     this.g.addEdge({nodes: [attr1, attr2], operator: node.operator})
-            // }
-
-            // return this.exploreNode(node.right);
-
             return this.manageSubQuery(node.right, "ALL", node);
         } else if (node.type == "ComparisonBooleanPrimary") {
             if (node.left.type == "Identifier" && node.right.type == "Identifier"){
@@ -221,14 +197,10 @@ class QueryParser {
         let t = this.g.groups.find(gr => gr.tablealias == tableidentifier && gr.grouptype == "table")
         if (this.g.groups.find(gr => gr.tablealias == tableidentifier && gr.subqueryid == this.subquerycount && gr.grouptype == "table"))
             t = this.g.groups.find(gr => gr.tablealias == tableidentifier && gr.subqueryid == this.subquerycount && gr.grouptype == "table")
-        // if (t == undefined){
-        //     t = {nodes: [], grouptype: "table", subqueryid: this.subquerycount, tablealias: tableidentifier, name: tableidentifier}
-        //     this.g.addGroup(t);
-        // }
 
         let attr = t.nodes.find(n => n.name == attrname)
         if (attr == undefined){
-            attr = {name: attrname, depth: 0, table: t}
+            attr = {name: attrname, depth: 0, table: t, astNodeIndex: node.astNodeIndex}
             t.nodes.push(attr)
             this.g.addNode(attr)
         }
